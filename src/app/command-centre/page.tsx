@@ -165,29 +165,77 @@ export default function CommandCentre() {
 
     let response = "";
     const lowerQ = q.toLowerCase();
+    const isMarathi = /[\u0900-\u097F]/.test(q) && /आहे|कुठे|जवळ|वेळापत्रक|तळ|रिंगण|रुग्णालय|टँकर|पाणी|वारकरी|जेवण|शौचालय|संडास/.test(q) || /\b(aahe|ahe|kuthe|javal|velapatrak|ringan|jevan|sandas|sandaas)\b/.test(lowerQ);
+    const isHindi = /[\u0900-\u097F]/.test(q) && /है|कहाँ|नजदीक|पानी|टैंकर|अस्पताल|शेड्यूल|शिविर|शौचालय|भोजन|खाना/.test(q) || /\b(kahan|kaha|hai|sabse|nazdik|paani|bhojan|khana|aspataal)\b/.test(lowerQ);
+    const targetLang = isMarathi ? "mr" : isHindi ? "hi" : "en";
 
-    if (lowerQ.includes("schedule") || lowerQ.includes("वेळापत्रक") || lowerQ.includes("शेड्यूल") || lowerQ.includes("ringan") || lowerQ.includes("रिंगण")) {
+    // 1. Toilet / Sanitation
+    if (/toilet|toliet|washroom|restroom|sanitation|bathroom|sandaas|sandas|shauchalay|शौचालय|प्रसाधनगृह|संडास|स्वच्छता/.test(lowerQ)) {
+      const nearestCrew = state.sanitationCrews[0];
+      response = targetLang === "mr"
+        ? `जवळची स्वच्छतागृहे: ${nearestCrew?.name ?? "पुणे महापालिका बायो-टॉयलेट पथक १"} (${nearestCrew?.mobilePodsCount ?? 24} मोबाईल पॉड्स) ${nearestCrew?.zone ?? "पुणे झोन"} येथे उपलब्ध आहे. सर्व ८ तळांवर २४ तास स्वतंत्र स्वच्छतागृहे कार्यरत आहेत.`
+        : targetLang === "hi"
+        ? `नजदीकी शौचालय सुविधा: ${nearestCrew?.name ?? "पुणे बायो-टॉयलेट स्क्वॉड 1"} (${nearestCrew?.mobilePodsCount ?? 24} मोबाइल पॉड्स) ${nearestCrew?.zone ?? "पुणे जोन"} पर 24/7 चालू हैं।`
+        : `Nearest Sanitation Facility: ${nearestCrew?.name ?? "Pune Municipal Bio-Toilet Squad 1"} with ${nearestCrew?.mobilePodsCount ?? 24} mobile bio-toilet pods deployed at ${nearestCrew?.zone ?? "Pune Zone"}. Separate 24/7 facilities active across all 8 camps.`;
+    }
+    // 2. Food / Prasad / Meals (Camp specific)
+    else if (/food|prasad|prasadam|meal|meals|anna|annadan|jevan|bhojan|khana|भोजन|जेवण|प्रसाद|अन्नदान|kitchen/.test(lowerQ)) {
+      const isCamp5 = /camp\s*5|saswad|सासवड|तळ\s*५|तळ\s*5|शिविर\s*5/.test(lowerQ);
+      const isCamp2 = /camp\s*2|hadapsar|हडपसर|तळ\s*२|तळ\s*2|शिविर\s*2/.test(lowerQ);
+      const isCamp1 = /camp\s*1|pune|पुणे|तळ\s*१|तळ\s*1|शिविर\s*1/.test(lowerQ);
+
+      const campName = isCamp5 ? "Camp 5 (Saswad Palkhi Maidan)" : isCamp2 ? "Camp 2 (Hadapsar Transit Yard)" : isCamp1 ? "Camp 1 (Pune Racecourse)" : "Camp 5 (Saswad)";
+      const meals = isCamp5 ? "45,000" : isCamp2 ? "30,000" : "50,000";
+
+      response = targetLang === "mr"
+        ? `${campName} अन्नदान व महाप्रसाद केंद्र: अखंड महाप्रसाद रसोई सज्ज (${meals} जेवणांची क्षमता). गरम खिचडी, भाकरी, पिठलं आणि पिण्याचे पाणी २४ तास उपलब्ध आहे.`
+        : targetLang === "hi"
+        ? `${campName} भोजन एवं महाप्रसाद केंद्र: केंद्रीय रसोई (${meals} भोजन क्षमता) पर गरमा-गरम महाप्रसाद और शुद्ध पेयजल 24 घंटे उपलब्ध है।`
+        : `Food & Maha-Prasad Logistics for ${campName}: Central Annadan Kitchen (${meals} meals prep capacity) operational with hot fresh Khichdi, Bhakri, and potable water around the clock.`;
+    }
+    // 3. Hospital / Medical
+    else if (/hospital|medical|doctor|ambulance|रुग्णालय|दवाखाना|अस्पताल|इलाज|डॉक्टर|emergency|icu/.test(lowerQ)) {
+      response = targetLang === "mr"
+        ? "पालखी मार्गावरील आणीबाणी रुग्णालये: १. दीनानाथ मंगेशकर रुग्णालय (इरंडवणे - ०२०-४०१५१०००), २. ससून सर्वोपचार रुग्णालय (पुणे स्टेशन - ०२०-२६१२८०००), ३. सासवड उप-जिल्हा रुग्णालय. तातडीच्या मदतीसाठी १०८ रुग्णवाहिका सज्ज आहे."
+        : targetLang === "hi"
+        ? "कॉरिडोर के आपातकालीन अस्पताल: 1. दीनानाथ मंगेशकर अस्पताल (020-40151000), 2. ससून जनरल अस्पताल (020-26128000), 3. सासवड उप-जिला अस्पताल। आपातकालीन 108 एम्बुलेंस सेवा उपलब्ध है।"
+        : "Emergency Hospitals along Corridor: 1. Deenanath Mangeshkar Hospital (Erandwane - 020-40151000), 2. Sassoon General Hospital (Station Road - 020-26128000), 3. Saswad Sub-District Hospital. Dial 108 for immediate 24/7 ambulance dispatch.";
+    }
+    // 4. Schedule & Ringan
+    else if (lowerQ.includes("schedule") || lowerQ.includes("वेळापत्रक") || lowerQ.includes("शेड्यूल") || lowerQ.includes("ringan") || lowerQ.includes("रिंगण")) {
       response =
-        language === "mr"
+        targetLang === "mr"
           ? "अधिकृत २०२६ पालखी वेळापत्रक: पहिले उभे रिंगण काटेवाडी येथे १८ जुलै रोजी आहे, दुसरे रिंगण अकलूज येथे २१ जुलै रोजी आहे आणि शेवटचे बाजीराव विहीर येथे २४ जुलै रोजी आहे. आषाढी एकादशी २६ जुलै रोजी पंढरपुरात आहे."
-          : language === "hi"
+          : targetLang === "hi"
           ? "2026 पालखी रिंगण का शेड्यूल: पहला रिंगण काटेवाडी में 18 जुलाई, दूसरा अकलूज में 21 जुलाई, और बाजीराव विहीर में 24 जुलाई को होगा। आषाढ़ी एकादशी 26 जुलाई को है।"
           : "Official 2026 Palkhi Ringan Schedule: First Ringan at Katewadi on 18 July, Second Ringan at Akluj on 21 July, Bajirao Vihir on 24 July. Ashadhi Ekadashi is on 26 July 2026 at Pandharpur.";
-    } else if (lowerQ.includes("dindi") || lowerQ.includes("दिंडी") || lowerQ.includes("crowd") || lowerQ.includes("गर्दी")) {
-      response =
-        liveDindis.length > 0
-          ? language === "mr"
-            ? `सध्या ${liveDindis.length} नोंदणीकृत दिंड्या ट्रॅक केल्या जात आहेत. एकूण भाविक: ${state.totalPilgrims.toLocaleString()}. जवळचा तळ: ${selectedFacilities?.camp?.item.name ?? "कॅम्प १"}.`
-            : `Currently tracking ${liveDindis.length} registered Dindis with ${state.totalPilgrims.toLocaleString()} pilgrims. Nearest halt is ${selectedFacilities?.camp?.item.name ?? "Camp 1"}.`
-          : "No live Dindis registered yet. Dindi leaders can register at /dindi to broadcast GPS.";
-    } else if (lowerQ.includes("water") || lowerQ.includes("tanker") || lowerQ.includes("पाणी") || lowerQ.includes("टँकर")) {
-      response = `There are ${availableTankers} water tankers available along the corridor. Nearest tanker is ${selectedFacilities?.tanker?.item.id ?? "T-03"} located ${selectedFacilities?.tanker?.distanceKm ?? 0} km away with estimated arrival in 15 minutes.`;
+    }
+    // 5. Water Tanker
+    else if (lowerQ.includes("water") || lowerQ.includes("tanker") || lowerQ.includes("पाणी") || lowerQ.includes("टँकर")) {
+      const nearestTanker = state.tankers.find((t) => t.status === "AVAILABLE") || state.tankers[0];
+      response = targetLang === "mr"
+        ? `उपलब्ध पाण्याचे टँकर: ${state.tankers.length} टँकर तैनात. जवळचा टँकर ${nearestTanker?.id ?? "LIVE-WATER-PUNE-01"} (${nearestTanker?.capacityLiters.toLocaleString()}L) ${nearestTanker?.currentHub ?? "पुणे हब"} येथे उपलब्ध आहे.`
+        : targetLang === "hi"
+        ? `जल आपूर्ति स्थिति: ${state.tankers.length} टैंकर सक्रिय। नजदीकी टैंकर ${nearestTanker?.id ?? "LIVE-WATER-PUNE-01"} (${nearestTanker?.capacityLiters.toLocaleString()}L) ${nearestTanker?.currentHub ?? "पुणे हब"} पर तैनात है।`
+        : `Corridor Water Fleet: ${state.tankers.length} water tankers active. Nearest available tanker is ${nearestTanker?.id ?? "LIVE-WATER-PUNE-01"} (${nearestTanker?.capacityLiters.toLocaleString()}L) stationed at ${nearestTanker?.currentHub ?? "Pune Bhavani Peth Hub"}.`;
+    }
+    // 6. Camps & Safe Capacity
+    else if (lowerQ.includes("camp") || lowerQ.includes("तळ") || lowerQ.includes("शिविर") || lowerQ.includes("capacity") || lowerQ.includes("क्षमता")) {
+      response = targetLang === "mr"
+        ? "पालखी मार्ग तळ १ ते ८ क्षमता: तळ १ पुणे (४०,०००), तळ २ हडपसर (३०,०००), तळ ३ वाडकी (२५,०००), तळ ४ झाडाचे मठ (२०,०००), तळ ५ सासवड (४५,०००), तळ ६ जेजुरी (५०,०००), तळ ७ लोणंद (३५,०००), तळ ८ फलटण (६०,०००). एकूण सुरक्षित क्षमता: ३,०५,००० भाविक."
+        : targetLang === "hi"
+        ? "शिविर 1 से 8 सुरक्षित क्षमता: शिविर 1 पुणे (40,000), शिविर 2 हड़पसर (30,000), शिविर 3 वाडकी (25,000), शिविर 4 मठ (20,000), शिविर 5 सासवड (45,000), शिविर 6 जेजुरी (50,000), शिविर 7 लोणंद (35,000), शिविर 8 फलटण (60,000)। कुल क्षमता: 305,000।"
+        : "Camps 1–8 Safe Capacities: Camp 1 Pune (40k), Camp 2 Hadapsar (30k), Camp 3 Wadki (25k), Camp 4 Zadache Math (20k), Camp 5 Saswad (45k), Camp 6 Jejuri (50k), Camp 7 Lonand (35k), Camp 8 Phaltan (60k). Total safe corridor buffer: 305,000 devotees.";
     } else {
-      response = `Command Status: ${liveDindis.length} live Dindis, ${state.camps.length} camps operational, ${activeAlerts.length} active alerts. All 6 camp sectors are staffed with active volunteers.`;
+      response = targetLang === "mr"
+        ? `कमांड सेंटर थेट स्थिती: ${liveDindis.length} नोंदणीकृत दिंड्या, ${state.camps.length} अधिकृत तळ कार्यरत, आणि ${state.tankers.length} पाण्याचे टँकर सज्ज आहेत.`
+        : targetLang === "hi"
+        ? `कमांड सेंटर लाइव स्थिति: ${liveDindis.length} पंजीकृत दिंडियां, ${state.camps.length} शिविर और ${state.tankers.length} पानी के टैंकर सक्रिय हैं।`
+        : `Command Status: ${liveDindis.length} live Dindis registered, ${state.camps.length} corridor camps operational, and ${state.tankers.length} water tankers available with 0 active bottlenecks.`;
     }
 
     setAiResponse(response);
-    speak(response, language);
+    speak(response, targetLang);
   };
 
   const handleDispatchSubmit = (e: React.FormEvent) => {

@@ -114,7 +114,7 @@ export default function SimulatorPage() {
         <div className="card-base p-6 space-y-4 border-2 border-emerald-200 bg-emerald-50/40">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-bold text-wari-textPrimary">Live MMCOE What-If Baseline</h2>
+              <h2 className="text-sm font-bold text-wari-textPrimary">Live Dindi What-If Baseline</h2>
               <p className="text-xs text-wari-textSecond mt-1">
                 Uses registered Dindi GPS and leader-entered counts. Add Dindi B or change volume to see overcrowding projections.
               </p>
@@ -285,7 +285,7 @@ export default function SimulatorPage() {
 
             <div className="space-y-3 text-xs">
               {(state.isSimulating ? counterfactualResults : [
-                { metricName: "MMCOE Crowd Load", noActionValue: `${projectedPeople.toLocaleString()} people (${projectedOccupancy}%)` },
+                { metricName: "Selected Location Crowd Load", noActionValue: `${projectedPeople.toLocaleString()} people (${projectedOccupancy}%)` },
                 { metricName: "Capacity Breach", noActionValue: projectedOccupancy > 100 ? `${projectedPeople - liveCapacity} over safe capacity` : "No breach" },
                 { metricName: "Medical/Water Response", noActionValue: projectedOccupancy > 100 ? "Delayed triage, manual calls" : "Routine watch" },
               ]).map((r, idx) => (
@@ -315,7 +315,7 @@ export default function SimulatorPage() {
 
             <div className="space-y-3 text-xs">
               {(state.isSimulating ? counterfactualResults : [
-                { metricName: "MMCOE Crowd Load", wariosValue: `${Math.round((activeResponseOccupancy / 100) * liveCapacity).toLocaleString()} managed load`, delta: `-${Math.max(0, projectedOccupancy - activeResponseOccupancy)}% pressure` },
+                { metricName: "Selected Location Crowd Load", wariosValue: `${Math.round((activeResponseOccupancy / 100) * liveCapacity).toLocaleString()} managed load`, delta: `-${Math.max(0, projectedOccupancy - activeResponseOccupancy)}% pressure` },
                 { metricName: "Capacity Breach", wariosValue: activeResponseOccupancy > 100 ? "Overflow routed to nearest halt" : "Within managed threshold", delta: liveCluster?.nearestCamp?.item.name ?? "Awaiting Dindi" },
                 { metricName: "Medical/Water Response", wariosValue: "Nearest teams assigned from GPS", delta: liveCluster?.nearestMedical?.item.name ?? "Awaiting GPS" },
               ]).map((r, idx) => (

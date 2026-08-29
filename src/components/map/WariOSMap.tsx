@@ -718,7 +718,7 @@ const WariOSMapInner: React.FC<WariOSMapProps> = ({
       {!state.isSimulating && primaryLiveCluster && (
         <div className="absolute top-4 left-4 z-[400] bg-white/95 backdrop-blur border border-wari-cardBorder rounded-2xl p-3.5 shadow-lg max-w-[300px] space-y-2 text-xs animate-fadeIn">
           <div className="flex items-center justify-between gap-3 pb-2 border-b border-wari-cardBorder">
-            <span className="font-bold text-sm text-wari-textPrimary">Live MMCOE Ops</span>
+            <span className="font-bold text-sm text-wari-textPrimary">Live Dindi Ops</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
               primaryLiveCluster.overcrowdedBy > 0 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-800"
             }`}>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Droplets, 
   Stethoscope, 
@@ -10,43 +10,72 @@ import {
   CheckCircle2, 
   AlertTriangle, 
   Navigation, 
-  Flame, 
   Construction, 
   Users, 
-  Compass, 
   Radio, 
-  HeartHandshake
+  HeartHandshake,
+  Hospital as HospitalIcon,
+  Clock
 } from "lucide-react";
 import { useSimulation } from "@/context/SimulationContext";
 import { useLiveGps } from "@/context/LiveGpsContext";
 import { getDistanceKm } from "@/lib/live-ops";
+import { fetchLiveNearbyHospitals, RealHospital } from "@/lib/nearby-places";
 
 export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ selectedDindiId }) => {
   const { state, requestLeaderAssistance, addEventLog } = useSimulation();
   const { coords } = useLiveGps();
 
   const [requestSent, setRequestSent] = useState<string | null>(null);
+  const [hospitals, setHospitals] = useState<RealHospital[]>([]);
+  const [isLoadingHospitals, setIsLoadingHospitals] = useState(false);
 
   const activeDindi =
     state.dindis.find((d) => d.id === selectedDindiId) ??
     state.dindis.find((d) => d.passcode === selectedDindiId) ??
     state.dindis.find((d) => d.isCustomRegistered);
-  const currentLat = coords?.lat ?? activeDindi?.lat ?? 18.4905;
-  const currentLng = coords?.lng ?? activeDindi?.lng ?? 73.8099;
 
-  // Compute nearby facilities
+  // If a Dindi is selected, prioritize its live GPS; else use device live GPS; else default to corridor start (18.5138, 73.8589)
+  const currentLat = activeDindi?.lat ?? coords?.lat ?? 18.5138;
+  const currentLng = activeDindi?.lng ?? coords?.lng ?? 73.8589;
+  const locationLabel = activeDindi ? activeDindi.name : coords ? "Your Phone GPS" : "Pune Corridor Base";
+
+  // Fetch real nearby hospitals whenever coordinates change
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoadingHospitals(true);
+    fetchLiveNearbyHospitals(currentLat, currentLng, 20)
+      .then((data) => {
+        if (isMounted) {
+          setHospitals(data.slice(0, 4));
+          setIsLoadingHospitals(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setIsLoadingHospitals(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [currentLat, currentLng]);
+
+  // Compute nearby tankers
   const nearbyTankers = state.tankers
-    .map((t) => ({ ...t, distKm: getDistanceKm(currentLat, currentLng, t.lat, t.lng) }))
+    .map((t) => {
+      const distKm = getDistanceKm(currentLat, currentLng, t.lat, t.lng);
+      const eta = Math.max(1, Math.round((distKm / 25) * 60)); // 25 km/h urban/highway tanker speed
+      return { ...t, distKm, calculatedEta: eta };
+    })
     .sort((a, b) => a.distKm - b.distKm)
     .slice(0, 3);
 
-  const nearbyMedical = state.medicalStations
-    .map((m) => ({ ...m, distKm: getDistanceKm(currentLat, currentLng, m.lat, m.lng) }))
-    .sort((a, b) => a.distKm - b.distKm)
-    .slice(0, 3);
-
+  // Compute nearby verified camps (Camps 1-6)
   const nearbyCamps = state.camps
-    .map((c) => ({ ...c, distKm: getDistanceKm(currentLat, currentLng, c.lat, c.lng) }))
+    .map((c) => {
+      const distKm = getDistanceKm(currentLat, currentLng, c.lat, c.lng);
+      const walkingHours = (distKm / 3.8).toFixed(1);
+      return { ...c, distKm, walkingHours };
+    })
     .sort((a, b) => a.distKm - b.distKm)
     .slice(0, 3);
 
@@ -57,16 +86,20 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
     .slice(0, 4);
 
   const handleQuickRequest = (type: "WATER" | "MEDICAL" | "HALT" | "ROAD" | "SANITATION", label: string) => {
-    const posStr = coords ? `Lat ${coords.lat.toFixed(4)}, Lng ${coords.lng.toFixed(4)}` : "Sector 3 Dive Ghat";
+    const posStr = activeDindi
+      ? `${activeDindi.name} (Code: ${activeDindi.passcode || activeDindi.number}) at Lat ${activeDindi.lat.toFixed(4)}, Lng ${activeDindi.lng.toFixed(4)}`
+      : coords
+      ? `Lat ${coords.lat.toFixed(4)}, Lng ${coords.lng.toFixed(4)}`
+      : "Corridor GPS";
     
     if (type === "WATER" || type === "MEDICAL" || type === "HALT") {
-      requestLeaderAssistance(type, `${label} requested by Dindi leader at ${posStr}`);
+      requestLeaderAssistance(type, `${label} requested for ${posStr}`);
     } else {
       addEventLog({
         eventType: "ALERT",
         severity: "WARNING",
         source: "Dindi Leader Report",
-        description: `${label}: Reported by Dindi leader at ${posStr}`,
+        description: `${label}: Reported for ${posStr}`,
       });
     }
 
@@ -79,20 +112,20 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
       
       {/* ── 1-TAP QUICK ACTIONS / REQUESTS ── */}
       <div className="card-base p-6 border-2 border-amber-500/40 bg-white space-y-4 shadow-sm">
-        <div className="flex items-center justify-between pb-3 border-b border-wari-cardBorder">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-wari-cardBorder gap-2">
           <div className="flex items-center gap-2.5">
-            <Radio className="w-5 h-5 text-wari-orange animate-pulse" />
+            <Radio className="w-5 h-5 text-wari-orange animate-pulse shrink-0" />
             <div>
               <h3 className="text-sm font-bold text-wari-textPrimary">
                 🚨 Dindi Leader 1-Tap Quick Actions & Assistance
               </h3>
               <p className="text-xs text-wari-textMuted">
-                Instantly alerts corridor authorities and nearest volunteers with your live GPS location
+                Live context: <strong className="text-orange-700">{locationLabel}</strong> ({currentLat.toFixed(4)}°N, {currentLng.toFixed(4)}°E)
               </p>
             </div>
           </div>
-          <span className="text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full">
-            INSTANT DISPATCH
+          <span className="text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full shrink-0">
+            GPS LINKED DISPATCH
           </span>
         </div>
 
@@ -101,7 +134,7 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
           <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center gap-2.5 text-xs text-emerald-800 animate-fadeIn">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
             <span>
-              <strong>Request Transmitted:</strong> {requestSent}. Control room & nearest field seva teams notified.
+              <strong>Request Transmitted:</strong> {requestSent}. Control room & nearest field seva teams notified with live coordinates.
             </span>
           </div>
         )}
@@ -167,47 +200,46 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
               </h3>
             </div>
             <span className="text-[10px] text-wari-textMuted font-mono font-bold">
-              GPS SORTED
+              GPS SORTED FROM {activeDindi ? activeDindi.name.slice(0, 15) : "LOCATION"}
             </span>
           </div>
 
-          <div className="space-y-3">
-            {/* Water Tankers */}
+          <div className="space-y-4">
+            {/* Closest Verified Hospitals & Medical Stations (Real GPS Lookup) */}
             <div>
-              <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider block mb-1.5">
-                💧 Closest Water Tankers & Points
-              </span>
-              <div className="space-y-1.5">
-                {nearbyTankers.map((t) => (
-                  <div key={t.id} className="p-3 bg-wari-pageBg rounded-xl border border-wari-cardBorder flex items-center justify-between text-xs">
-                    <div>
-                      <div className="font-bold text-wari-textPrimary">{t.id} — {t.currentHub}</div>
-                      <div className="text-[11px] text-wari-textMuted">Capacity: {t.capacityLiters.toLocaleString()}L • Driver: {t.driverName}</div>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-bold text-blue-600 block">{t.distKm} km away</span>
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">{t.status}</span>
-                    </div>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-bold text-red-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <HospitalIcon className="w-3.5 h-3.5 text-red-600" />
+                  Closest Hospitals & Trauma Centres
+                </span>
+                {isLoadingHospitals && (
+                  <span className="text-[10px] text-wari-textMuted animate-pulse">Scanning live...</span>
+                )}
               </div>
-            </div>
-
-            {/* Medical Posts */}
-            <div className="pt-2">
-              <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block mb-1.5">
-                🏥 Closest Medical & Emergency Posts
-              </span>
-              <div className="space-y-1.5">
-                {nearbyMedical.map((m) => (
-                  <div key={m.id} className="p-3 bg-wari-pageBg rounded-xl border border-wari-cardBorder flex items-center justify-between text-xs">
-                    <div>
-                      <div className="font-bold text-wari-textPrimary">{m.name}</div>
-                      <div className="text-[11px] text-wari-textMuted">{m.doctorCount} Doctors • {m.availableAmbulances} Ambulances • {m.heatStrokeKits} Kits</div>
+              <div className="space-y-2">
+                {hospitals.map((h) => (
+                  <div key={h.id} className="p-3 bg-red-50/60 rounded-xl border border-red-200/80 flex items-center justify-between text-xs hover:border-red-300 transition-colors">
+                    <div className="space-y-0.5">
+                      <div className="font-bold text-red-950 flex items-center gap-1.5">
+                        <span>{h.name}</span>
+                      </div>
+                      <div className="text-[11px] text-red-700">
+                        {h.doctorCount} Doctors • {h.availableAmbulances} Ambulances • {h.heatStrokeKits} Heat Kits
+                      </div>
+                      {h.address && (
+                        <div className="text-[10px] text-red-600 font-mono">📍 {h.address}</div>
+                      )}
                     </div>
-                    <div className="text-right">
-                      <span className="font-bold text-emerald-600 block">{m.distKm} km away</span>
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">{m.status}</span>
+                    <div className="text-right shrink-0 pl-2">
+                      <span className="font-bold text-red-700 text-sm block">{h.distKm} km</span>
+                      {h.emergencyPhone && (
+                        <a
+                          href={`tel:${h.emergencyPhone.replace(/\s+/g, "")}`}
+                          className="text-[10px] px-2 py-0.5 rounded bg-red-600 text-white font-bold inline-flex items-center gap-1 mt-1 hover:bg-red-700"
+                        >
+                          <Phone className="w-2.5 h-2.5" /> Call
+                        </a>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -217,20 +249,45 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
             {/* Camps & Halts */}
             <div className="pt-2">
               <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider block mb-1.5">
-                ⛺ Closest Halts & Rest Grounds
+                ⛺ Closest Halts & Rest Grounds (Camps 1–6)
               </span>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {nearbyCamps.map((c) => (
                   <div key={c.id} className="p-3 bg-wari-pageBg rounded-xl border border-wari-cardBorder flex items-center justify-between text-xs">
                     <div>
                       <div className="font-bold text-wari-textPrimary">{c.name}</div>
-                      <div className="text-[11px] text-wari-textMuted">Capacity: {c.capacity.toLocaleString()} • Water: {c.waterStockPercent}%</div>
+                      <div className="text-[11px] text-wari-textMuted">
+                        Capacity: {c.capacity.toLocaleString()} • Water: {c.waterStockPercent}% • Approx. {c.walkingHours}h walk
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="font-bold text-purple-600 block">{c.distKm} km away</span>
+                    <div className="text-right shrink-0 pl-2">
+                      <span className="font-bold text-purple-600 text-sm block">{c.distKm} km away</span>
                       <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
-                        c.status === "CRITICAL" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"
+                        c.status === "CRITICAL" ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800"
                       }`}>{c.status}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Water Tankers */}
+            <div className="pt-2">
+              <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider block mb-1.5">
+                💧 Closest Water Tankers & Points
+              </span>
+              <div className="space-y-2">
+                {nearbyTankers.map((t) => (
+                  <div key={t.id} className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/80 flex items-center justify-between text-xs">
+                    <div>
+                      <div className="font-bold text-blue-950">{t.id} — {t.currentHub}</div>
+                      <div className="text-[11px] text-blue-800">
+                        {t.capacityLiters.toLocaleString()}L • Driver: {t.driverName}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 pl-2">
+                      <span className="font-bold text-blue-700 text-sm block">{t.distKm} km</span>
+                      <span className="text-[10px] text-blue-600 font-semibold block">ETA ~{t.calculatedEta}m</span>
                     </div>
                   </div>
                 ))}
@@ -245,23 +302,23 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
             <div className="flex items-center gap-2">
               <HeartHandshake className="w-4 h-4 text-wari-orange" />
               <h3 className="text-sm font-bold text-wari-textPrimary">
-                Nearby Ground Volunteers & Contact Numbers
+                Nearby Ground Volunteers & Seva Contacts
               </h3>
             </div>
             <span className="text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full">
-              DIRECT SEVA CALL
+              DIRECT CALL
             </span>
           </div>
 
           <p className="text-xs text-wari-textMuted">
-            Dindi leaders can call on-ground volunteers directly for route guidance, water assistance, crowd marshalling, or medical support.
+            Dindi leaders can call on-ground volunteers stationed along Camps 1–6 directly for route guidance, water assistance, or medical aid.
           </p>
 
           <div className="space-y-3">
             {nearbyVolunteers.map((v) => (
               <div
                 key={v.id}
-                className="p-4 bg-wari-pageBg border border-wari-cardBorder rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                className="p-4 bg-wari-pageBg border border-wari-cardBorder rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:border-purple-300 transition-colors"
               >
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">

@@ -129,9 +129,12 @@ export const Header: React.FC = () => {
           )}
 
           {/* Clock */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-wari-textPrimary text-white rounded-xl text-xs font-mono font-bold">
+          <div
+            suppressHydrationWarning
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-wari-textPrimary text-white rounded-xl text-xs font-mono font-bold"
+          >
             <Clock className="w-3 h-3 text-wari-orange" />
-            {clock || state.currentClock}
+            <span suppressHydrationWarning>{clock || state.currentClock}</span>
           </div>
         </div>
       </header>

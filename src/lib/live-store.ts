@@ -162,6 +162,32 @@ export async function saveLiveDindis(dindis: Dindi[]): Promise<void> {
   });
 }
 
+export async function deleteLiveDindi(dindiId: string): Promise<void> {
+  if (canUseSupabase()) {
+    try {
+      await supabaseRequest(`live_dindis?id=eq.${encodeURIComponent(dindiId)}`, {
+        method: "DELETE",
+      });
+    } catch (error) {
+      console.warn("[WariOS] Supabase delete failed", error);
+    }
+  }
+
+  const db = await openLiveDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DINDI_STORE, "readwrite");
+    tx.objectStore(DINDI_STORE).delete(dindiId);
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
+  });
+}
+
 export async function clearLocalLiveDindis(): Promise<void> {
   const db = await openLiveDb();
   return new Promise((resolve, reject) => {

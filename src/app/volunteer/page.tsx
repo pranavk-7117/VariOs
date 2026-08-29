@@ -14,22 +14,16 @@ import {
   Clock,
   Mic,
   MicOff,
+  Send,
+  ShieldAlert,
+  ChevronRight,
+  XCircle,
 } from "lucide-react";
 import { useSimulation } from "@/context/SimulationContext";
 import { useLiveGps } from "@/context/LiveGpsContext";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { parseReportIntent } from "@/lib/speech-intents";
-
-type TaskStatus = "ASSIGNED" | "IN_PROGRESS" | "COMPLETED";
-
-interface Task {
-  id: string;
-  title: string;
-  priority: "HIGH" | "MEDIUM";
-  location: string;
-  status: TaskStatus;
-  desc: string;
-}
+import { VolunteerTask } from "@/lib/types";
 
 export default function VolunteerPortal() {
   const { state, addEventLog, reportVolunteerIncident, updateVolunteerTask } = useSimulation();
@@ -38,11 +32,16 @@ export default function VolunteerPortal() {
 
   const [isAvailable, setIsAvailable] = useState(true);
   const [reportSuccess, setReportSuccess] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"report" | "dindis" | "team">("report");
-  const [myTasks, setMyTasks] = useState<Task[]>([]);
+  const [activeTab, setActiveTab] = useState<"tasks" | "report" | "dindis" | "team">("tasks");
+  const [selectedCampId, setSelectedCampId] = useState<string>("ALL");
   const [remarksByTask, setRemarksByTask] = useState<Record<string, string>>({});
 
-  // Only real registered Dindis
+  // Filter tasks by selected camp (or show all)
+  const filteredTasks = state.volunteerTasks.filter((t) =>
+    selectedCampId === "ALL" ? true : t.campId === selectedCampId
+  );
+
+  // Real registered Dindis
   const realDindis = state.dindis.filter((d) => d.isCustomRegistered);
 
   const handle1TapReport = (label: string, _emoji: string, severity: "HIGH" | "CRITICAL" | "MEDIUM") => {
@@ -61,48 +60,39 @@ export default function VolunteerPortal() {
     if (!transcript) return;
     const intent = parseReportIntent(transcript);
     if (!intent) return;
-    const severity = intent === "Medical Emergency" ? "CRITICAL" : intent === "Sanitation Full" || intent === "Lost Pilgrim" ? "MEDIUM" : "HIGH";
+    const severity =
+      intent === "Medical Emergency"
+        ? "CRITICAL"
+        : intent === "Sanitation Full" || intent === "Lost Pilgrim"
+        ? "MEDIUM"
+        : "HIGH";
     handle1TapReport(intent, "", severity);
     reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transcript]);
 
-  const advanceTask = (id: string) => {
-    setMyTasks((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-        const next: TaskStatus = t.status === "ASSIGNED" ? "IN_PROGRESS" : "COMPLETED";
-        addEventLog({
-          eventType: "DISPATCH",
-          severity: "INFO",
-          source: "Volunteer Task Update",
-          description: `Task "${t.title}" → ${next}`,
-        });
-        return { ...t, status: next };
-      })
-    );
-  };
-
   return (
-    <div className="max-w-2xl mx-auto space-y-5 animate-fadeIn">
+    <div className="max-w-3xl mx-auto space-y-5 animate-fadeIn pb-12">
 
       {/* ── PORTAL HEADER ── */}
-      <div className="rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 p-5 text-white shadow-lg">
-        <div className="flex items-center justify-between gap-3">
+      <div className="rounded-2xl bg-gradient-to-br from-purple-700 via-indigo-800 to-slate-900 p-5 text-white shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="text-3xl">👷</span>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Volunteer Seva Portal</h1>
-              <p className="text-sm text-purple-100">Field coordination · Incident reporting · Live GPS</p>
+              <h1 className="text-xl font-bold tracking-tight">Volunteer Seva & Verification Portal</h1>
+              <p className="text-xs text-purple-200">
+                Ground coordination · Camps 1–6 Tasks · Resource Verification · Live Sync
+              </p>
             </div>
           </div>
 
           {/* Availability toggle */}
           <button
             onClick={() => setIsAvailable(!isAvailable)}
-            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border-2 ${
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border-2 self-start sm:self-auto ${
               isAvailable
-                ? "bg-emerald-500 border-emerald-300 text-white"
+                ? "bg-emerald-500 border-emerald-300 text-white shadow-sm"
                 : "bg-white/10 border-white/20 text-white/70"
             }`}
           >
@@ -111,30 +101,73 @@ export default function VolunteerPortal() {
           </button>
         </div>
 
+        {/* Live GPS status */}
         {coords && (
           <div className="mt-3 text-xs text-purple-100 flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2">
-            <MapPin className="w-3.5 h-3.5 shrink-0" />
-            <span className="font-mono">{coords.lat.toFixed(4)}°N, {coords.lng.toFixed(4)}°E</span>
-            <span className="ml-auto font-semibold bg-white/20 px-2 py-0.5 rounded-full">
-              {coords.speedKmH} km/h
+            <MapPin className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+            <span className="font-mono">
+              {coords.lat.toFixed(4)}°N, {coords.lng.toFixed(4)}°E
+            </span>
+            <span className="ml-auto font-semibold bg-white/20 px-2 py-0.5 rounded-full text-[10px]">
+              Accuracy ±{coords.accuracy}m · {coords.speedKmH} km/h
             </span>
           </div>
         )}
       </div>
 
+      {/* ── CAMP 1-6 SECTOR SELECTOR ── */}
+      <div className="rounded-2xl border border-purple-200 bg-white p-4 shadow-sm space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+            <Building2 className="w-3.5 h-3.5 text-purple-700" />
+            Select Your Assigned Camp Sector
+          </span>
+          <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded-full">
+            {selectedCampId === "ALL" ? "All Camps" : state.camps.find((c) => c.id === selectedCampId)?.name || selectedCampId}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-1.5 pt-1">
+          <button
+            onClick={() => setSelectedCampId("ALL")}
+            className={`px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+              selectedCampId === "ALL"
+                ? "bg-purple-700 text-white shadow-sm"
+                : "bg-wari-pageBg text-wari-textSecond hover:bg-purple-50"
+            }`}
+          >
+            All Camps
+          </button>
+          {state.camps.slice(0, 6).map((camp, idx) => (
+            <button
+              key={camp.id}
+              onClick={() => setSelectedCampId(camp.id)}
+              className={`px-2.5 py-2 rounded-xl text-xs font-bold transition-all truncate text-left sm:text-center ${
+                selectedCampId === camp.id
+                  ? "bg-purple-700 text-white shadow-sm"
+                  : "bg-wari-pageBg text-wari-textSecond hover:bg-purple-50"
+              }`}
+              title={camp.name}
+            >
+              Camp {idx + 1}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ── TAB NAVIGATION ── */}
       <div className="flex gap-2 bg-wari-pageBg p-1 rounded-xl border border-wari-cardBorder">
         {[
+          { id: "tasks", label: `📋 Assigned Tasks (${filteredTasks.length})` },
           { id: "report", label: "🚨 Report Incident" },
           { id: "dindis", label: `🚩 Dindis (${realDindis.length})` },
-          { id: "team", label: "👥 Volunteers" },
+          { id: "team", label: "👥 Volunteers (Camps 1–6)" },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${
               activeTab === tab.id
-                ? "bg-white shadow text-wari-textPrimary"
+                ? "bg-white shadow text-purple-900 border border-purple-100"
                 : "text-wari-textSecond hover:text-wari-textPrimary"
             }`}
           >
@@ -143,7 +176,160 @@ export default function VolunteerPortal() {
         ))}
       </div>
 
-      {/* ── TAB: INCIDENT REPORT ── */}
+      {/* ── TAB 1: ASSIGNED TASKS & VERIFICATION ── */}
+      {activeTab === "tasks" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-sm font-bold text-wari-textPrimary flex items-center gap-2">
+              <Clock className="w-4 h-4 text-purple-700" />
+              Live Tasks from Command Centre
+            </h2>
+            <span className="text-[11px] text-wari-textMuted">Real-time Command Centre Sync</span>
+          </div>
+
+          {filteredTasks.length === 0 ? (
+            <div className="card-base p-8 text-center space-y-2 border-2 border-dashed border-wari-cardBorder">
+              <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-500" />
+              <h3 className="font-bold text-wari-textPrimary text-sm">All Clear — No Pending Tasks</h3>
+              <p className="text-xs text-wari-textMuted max-w-sm mx-auto">
+                When the Command Centre dispatches a resource (e.g. water tanker, medical aid, or crowd marshal) to this camp, it will appear here immediately for verification.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredTasks.map((task) => {
+                const isVerified = task.status === "VERIFIED";
+                const isRejected = task.status === "REJECTED";
+                const isInProgress = task.status === "IN_PROGRESS";
+
+                return (
+                  <div
+                    key={task.id}
+                    className={`rounded-2xl border-2 p-5 space-y-3.5 transition-all ${
+                      isVerified
+                        ? "bg-emerald-50/70 border-emerald-300"
+                        : isRejected
+                        ? "bg-red-50/70 border-red-300"
+                        : isInProgress
+                        ? "bg-blue-50/70 border-blue-300"
+                        : "bg-orange-50/70 border-orange-300"
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-white border border-gray-200 text-gray-800">
+                            {task.type}
+                          </span>
+                          <span className="text-[11px] text-wari-textMuted font-semibold">
+                            Camp: {task.campName}
+                          </span>
+                        </div>
+                        <h3 className="font-bold text-wari-textPrimary text-base mt-1">{task.title}</h3>
+                        <div className="text-xs text-wari-textSecond mt-0.5 flex flex-wrap items-center gap-3">
+                          <span>Assigned Volunteer: <strong>{task.volunteerName}</strong></span>
+                          <span>•</span>
+                          <span className="font-semibold text-orange-700">ETA: {task.etaMinutes} min</span>
+                          <span>•</span>
+                          <span className="text-[11px] text-wari-textMuted">Dispatched at {task.createdAt}</span>
+                        </div>
+                      </div>
+
+                      {/* Status Badge */}
+                      <span
+                        className={`text-xs font-bold px-3 py-1 rounded-full shrink-0 uppercase tracking-wider ${
+                          isVerified
+                            ? "bg-emerald-200 text-emerald-900 border border-emerald-300"
+                            : isRejected
+                            ? "bg-red-200 text-red-900 border border-red-300"
+                            : isInProgress
+                            ? "bg-blue-200 text-blue-900 border border-blue-300"
+                            : "bg-amber-200 text-amber-900 border border-amber-300 animate-pulse"
+                        }`}
+                      >
+                        {task.status}
+                      </span>
+                    </div>
+
+                    {/* Remarks Input */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-wari-textSecond block">
+                        Volunteer Ground Verification Remarks:
+                      </label>
+                      <textarea
+                        value={remarksByTask[task.id] ?? task.remarks ?? ""}
+                        onChange={(event) =>
+                          setRemarksByTask((prev) => ({ ...prev, [task.id]: event.target.value }))
+                        }
+                        placeholder="Add on-ground observations (e.g. Tanker arrived, water tested 12,000L full, queue cleared / or delayed at approach road)..."
+                        className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-purple-400 min-h-16"
+                      />
+                    </div>
+
+                    {/* Interactive Verification Buttons */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                      <button
+                        onClick={() =>
+                          updateVolunteerTask(
+                            task.id,
+                            "IN_PROGRESS",
+                            remarksByTask[task.id] || "Volunteer acknowledged and monitoring on ground"
+                          )
+                        }
+                        className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                          isInProgress
+                            ? "bg-blue-600 text-white border-blue-700 shadow-sm"
+                            : "bg-blue-100 hover:bg-blue-200 text-blue-900 border-blue-200"
+                        }`}
+                      >
+                        ⏳ Start / In Progress
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          updateVolunteerTask(
+                            task.id,
+                            "VERIFIED",
+                            remarksByTask[task.id] || "Resource arrived on site and verified by volunteer"
+                          )
+                        }
+                        className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                          isVerified
+                            ? "bg-emerald-700 text-white border-emerald-800 shadow-sm"
+                            : "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-sm"
+                        }`}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Approve / Arrival Verified
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          updateVolunteerTask(
+                            task.id,
+                            "REJECTED",
+                            remarksByTask[task.id] || "Not reached / issues reported by volunteer"
+                          )
+                        }
+                        className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                          isRejected
+                            ? "bg-red-700 text-white border-red-800 shadow-sm"
+                            : "bg-red-100 hover:bg-red-200 text-red-900 border-red-200"
+                        }`}
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        Reject / Issue Alert
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB 2: INCIDENT REPORT (1-Tap & Voice in 3 Languages) ── */}
       {activeTab === "report" && (
         <div className="space-y-4">
           <div className="rounded-2xl border-2 border-red-200 bg-white p-5 shadow-sm space-y-4">
@@ -155,26 +341,27 @@ export default function VolunteerPortal() {
               </div>
             </div>
 
-            <div className="rounded-xl bg-wari-pageBg border border-wari-cardBorder p-3 flex flex-col sm:flex-row sm:items-center gap-3">
+            {/* Voice Incident Box */}
+            <div className="rounded-xl bg-purple-50/70 border border-purple-200 p-3.5 flex flex-col sm:flex-row sm:items-center gap-3">
               <div className="flex-1">
-                <p className="text-xs font-bold text-wari-textPrimary">Voice Incident Report</p>
-                <p className="text-[11px] text-wari-textMuted">
-                  Say water shortage, medical emergency, crowd surge, road blocked, sanitation full, or lost pilgrim in English, Hindi, or Marathi.
+                <p className="text-xs font-bold text-purple-950">🎙️ Voice Incident Report (3 Languages)</p>
+                <p className="text-[11px] text-purple-800 mt-0.5">
+                  Speak in English, Hindi, or Marathi: e.g. "पाणी टंचाई आहे", "पानी का टैंकर चाहिए", "Water shortage at gate", "Medical emergency".
                 </p>
-                {transcript && <p className="mt-1 text-[11px] text-emerald-700 font-medium">Heard: {transcript}</p>}
+                {transcript && <p className="mt-1 text-[11px] text-emerald-800 font-bold">Heard: {transcript}</p>}
               </div>
               <button
                 type="button"
                 onClick={isListening ? reset : startListening}
                 disabled={!isSupported}
-                className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 ${
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shrink-0 ${
                   isListening
-                    ? "bg-red-100 text-red-700 border border-red-200"
-                    : "bg-purple-600 text-white hover:bg-purple-700"
+                    ? "bg-red-600 text-white animate-pulse"
+                    : "bg-purple-700 text-white hover:bg-purple-800"
                 } disabled:bg-stone-100 disabled:text-stone-400`}
               >
                 {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-                {isListening ? "Listening" : "Speak Report"}
+                {isListening ? "Listening..." : "Speak Incident"}
               </button>
             </div>
 
@@ -186,15 +373,8 @@ export default function VolunteerPortal() {
               </div>
             )}
 
-            {/* No GPS warning */}
-            {!coords && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center gap-2">
-                <MapPin className="w-3.5 h-3.5 shrink-0" />
-                <span>Enable phone GPS for precise auto-location. Reports still sent with manual location note.</span>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
+            {/* 1-Tap Incident Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {[
                 { label: "Crowd Surge", emoji: "👥", desc: "High compression", color: "orange", severity: "HIGH" as const },
                 { label: "Water Shortage", emoji: "💧", desc: "Tanker empty", color: "blue", severity: "HIGH" as const },
@@ -216,120 +396,20 @@ export default function VolunteerPortal() {
               ))}
             </div>
           </div>
-
-          {/* My Assigned Tasks */}
-          <div className="rounded-2xl border border-wari-cardBorder bg-white p-5 space-y-3">
-            <h2 className="text-sm font-bold text-wari-textPrimary flex items-center gap-2">
-              <Clock className="w-4 h-4 text-wari-orange" />
-              My Assigned Seva Tasks
-            </h2>
-            {state.volunteerTasks.length === 0 && myTasks.length === 0 ? (
-              <div className="text-center py-8 text-wari-textMuted">
-                <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-wari-cardBorder" />
-                <p className="text-sm">No tasks assigned yet.</p>
-                <p className="text-xs mt-1">Tasks from Command Centre will appear here.</p>
-              </div>
-            ) : (
-              <>
-              {state.volunteerTasks.map((task) => (
-                <div key={task.id} className="border border-orange-200 bg-orange-50 rounded-xl p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-white text-orange-800 border-orange-200">
-                        {task.type}
-                      </span>
-                      <div className="font-bold text-wari-textPrimary text-sm mt-1">{task.title}</div>
-                      <div className="text-xs text-wari-textMuted">Camp: {task.campName}</div>
-                      <div className="text-xs text-wari-textMuted">Assigned to: {task.volunteerName} · ETA {task.etaMinutes} min</div>
-                    </div>
-                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full shrink-0 ${
-                      task.status === "VERIFIED"
-                        ? "bg-emerald-100 text-emerald-800"
-                        : task.status === "REJECTED"
-                          ? "bg-red-100 text-red-800"
-                          : "bg-amber-100 text-amber-800"
-                    }`}>
-                      {task.status}
-                    </span>
-                  </div>
-
-                  <textarea
-                    value={remarksByTask[task.id] ?? task.remarks ?? ""}
-                    onChange={(event) => setRemarksByTask((prev) => ({ ...prev, [task.id]: event.target.value }))}
-                    placeholder="Add remarks: tanker reached, delayed, wrong location, crowd issue..."
-                    className="w-full rounded-xl border border-orange-200 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-orange-300 min-h-20"
-                  />
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      onClick={() => updateVolunteerTask(task.id, "IN_PROGRESS", remarksByTask[task.id])}
-                      className="rounded-xl bg-amber-100 text-amber-900 border border-amber-200 py-2 text-xs font-bold"
-                    >
-                      Start
-                    </button>
-                    <button
-                      onClick={() => updateVolunteerTask(task.id, "VERIFIED", remarksByTask[task.id] || "Verified on ground")}
-                      className="rounded-xl bg-emerald-600 text-white py-2 text-xs font-bold"
-                    >
-                      Approve / Reached
-                    </button>
-                    <button
-                      onClick={() => updateVolunteerTask(task.id, "REJECTED", remarksByTask[task.id] || "Not verified on ground")}
-                      className="rounded-xl bg-red-600 text-white py-2 text-xs font-bold"
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              {myTasks.map((t) => (
-                <div key={t.id} className="border border-wari-cardBorder rounded-xl p-4 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                        t.priority === "HIGH" ? "bg-red-50 text-red-800 border-red-200" : "bg-blue-50 text-blue-800 border-blue-200"
-                      }`}>
-                        {t.priority}
-                      </span>
-                      <div className="font-bold text-wari-textPrimary text-sm mt-1">{t.title}</div>
-                      <div className="text-xs text-wari-textMuted">📍 {t.location}</div>
-                    </div>
-                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full shrink-0 ${
-                      t.status === "COMPLETED" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                    }`}>
-                      {t.status}
-                    </span>
-                  </div>
-                  {t.status !== "COMPLETED" && (
-                    <button
-                      onClick={() => advanceTask(t.id)}
-                      className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
-                        t.status === "ASSIGNED"
-                          ? "bg-purple-600 hover:bg-purple-700 text-white"
-                          : "bg-emerald-600 hover:bg-emerald-700 text-white"
-                      }`}
-                    >
-                      {t.status === "ASSIGNED" ? "✅ Accept & Start" : "🏁 Mark Resolved"}
-                    </button>
-                  )}
-                </div>
-              ))}
-              </>
-            )}
-          </div>
         </div>
       )}
 
-      {/* ── TAB: APPROACHING DINDIS ── */}
+      {/* ── TAB 3: REGISTERED DINDIS IN SECTOR ── */}
       {activeTab === "dindis" && (
         <div className="rounded-2xl border border-wari-cardBorder bg-white p-5 space-y-4">
-          <h2 className="text-sm font-bold text-wari-textPrimary">Registered Dindis in Your Sector</h2>
+          <h2 className="text-sm font-bold text-wari-textPrimary">Registered Dindis in Pilgrimage Corridor</h2>
           {realDindis.length === 0 ? (
             <div className="text-center py-12 text-wari-textMuted">
               <span className="text-4xl block mb-3">🚩</span>
-              <p className="text-sm font-medium">No Dindis registered yet.</p>
-              <p className="text-xs mt-1">Dindi leaders register at <strong>/dindi</strong> and they appear here instantly.</p>
+              <p className="text-sm font-medium">No live Dindis registered yet.</p>
+              <p className="text-xs mt-1">
+                Dindi leaders self-register at <strong>/dindi</strong> and appear here instantly.
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -340,14 +420,14 @@ export default function VolunteerPortal() {
                       <div className="font-bold text-orange-900">{d.name}</div>
                       <div className="text-xs text-orange-700">Leader: {d.leader}</div>
                     </div>
-                    <span className="text-[10px] font-mono font-bold bg-orange-600 text-white px-2 py-0.5 rounded">
+                    <span className="text-[10px] font-mono font-bold bg-orange-600 text-white px-2.5 py-1 rounded-lg">
                       {d.passcode}
                     </span>
                   </div>
                   <div className="flex items-center gap-4 text-xs pt-2 border-t border-orange-200">
-                    <span>👥 <strong>{d.pilgrimCount.toLocaleString()}</strong></span>
+                    <span>👥 <strong>{d.pilgrimCount.toLocaleString()} devotees</strong></span>
                     <span>⚡ <strong className="text-emerald-700">{d.currentPaceKmH} km/h</strong></span>
-                    <span>📍 <strong>{d.lat.toFixed(3)}, {d.lng.toFixed(3)}</strong></span>
+                    <span>📍 <strong>{d.lat.toFixed(4)}°N, {d.lng.toFixed(4)}°E</strong></span>
                   </div>
                 </div>
               ))}
@@ -356,53 +436,58 @@ export default function VolunteerPortal() {
         </div>
       )}
 
-      {/* ── TAB: VOLUNTEER TEAM ── */}
+      {/* ── TAB 4: VOLUNTEER ROSTER ACROSS CAMPS 1-6 ── */}
       {activeTab === "team" && (
         <div className="rounded-2xl border border-wari-cardBorder bg-white p-5 space-y-4">
-          <h2 className="text-sm font-bold text-wari-textPrimary">Ground Volunteer Team</h2>
-          {state.volunteers.length === 0 ? (
-            <div className="text-center py-12 text-wari-textMuted">
-              <span className="text-4xl block mb-3">👷</span>
-              <p className="text-sm font-medium">No volunteers registered yet.</p>
-              <p className="text-xs mt-1">
-                In Live Mode, only volunteers who register appear here.
-                Switch to <strong>Demo Archive</strong> to see historical volunteer data.
-              </p>
+          <div className="flex items-center justify-between pb-2 border-b border-wari-cardBorder">
+            <div>
+              <h2 className="text-sm font-bold text-wari-textPrimary">Ground Volunteer Team (Camps 1–6)</h2>
+              <p className="text-xs text-wari-textMuted">Assigned volunteers stationed along verified camps</p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {state.volunteers.map((v) => (
-                <div key={v.id} className="p-4 rounded-xl border border-wari-cardBorder space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <div className="font-bold text-wari-textPrimary">{v.name}</div>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
-                      {v.status}
-                    </span>
-                  </div>
-                  <div className="text-wari-textMuted">📍 {v.locationName}</div>
-                  {v.currentTask && (
-                    <div className="rounded-lg bg-amber-50 border border-amber-200 text-amber-900 px-3 py-2 font-semibold">
-                      Assigned: {v.currentTask}
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between pt-1 border-t border-wari-cardBorder">
-                    <span className="font-mono text-wari-textMuted">{v.phone || "—"}</span>
-                    {v.phone && (
-                      <a
-                        href={`tel:${v.phone}`}
-                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg flex items-center gap-1"
-                      >
-                        <Phone className="w-3 h-3" />
-                        Call
-                      </a>
-                    )}
-                  </div>
+            <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-2.5 py-1 rounded-full">
+              {state.volunteers.length} Active
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {state.volunteers.map((v) => (
+              <div
+                key={v.id}
+                className="p-4 rounded-xl border border-wari-cardBorder bg-wari-pageBg space-y-2 text-xs hover:border-purple-300 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-wari-textPrimary text-sm">{v.name}</div>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
+                    {v.status}
+                  </span>
                 </div>
-              ))}
-            </div>
-          )}
+                <div className="text-wari-textMuted flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-purple-600" />
+                  <span>{v.locationName}</span>
+                </div>
+                {v.currentTask && (
+                  <div className="p-2 bg-orange-100/70 border border-orange-200 rounded-lg text-[11px] text-orange-950 font-medium">
+                    📌 {v.currentTask}
+                  </div>
+                )}
+                <div className="flex items-center justify-between pt-2 border-t border-wari-cardBorder">
+                  <span className="font-mono text-wari-textSecond font-semibold">{v.phone || "+91 90000 10001"}</span>
+                  {v.phone && (
+                    <a
+                      href={`tel:${v.phone.replace(/\s+/g, "")}`}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg flex items-center gap-1 shadow-sm transition-all"
+                    >
+                      <Phone className="w-3 h-3" />
+                      Call
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
+
     </div>
   );
 }

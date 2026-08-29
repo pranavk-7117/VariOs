@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { Trash2 } from "lucide-react";
 import DindiLeaderRegisterCard from "@/components/dindis/DindiLeaderRegisterCard";
 import { DindiLeaderNearbyView } from "@/components/dindis/DindiLeaderNearbyView";
 import { PalkhiScheduleTimeline } from "@/components/dindis/PalkhiScheduleTimeline";
@@ -8,7 +9,7 @@ import { useSimulation } from "@/context/SimulationContext";
 import { useLiveGps } from "@/context/LiveGpsContext";
 
 export default function DindiPortal() {
-  const { state, resetAll } = useSimulation();
+  const { state, resetAll, deleteDindi } = useSimulation();
   const { coords, isTracking } = useLiveGps();
   const [selectedDindiId, setSelectedDindiId] = useState("");
   const [dindiSearch, setDindiSearch] = useState("");
@@ -127,11 +128,24 @@ export default function DindiPortal() {
                   <div className="font-bold text-orange-900">{d.name}</div>
                   <div className="text-xs text-orange-700">Leader: {d.leader} · {d.pilgrimCount.toLocaleString()} devotees</div>
                 </div>
-                <div className="text-right">
-                  <span className="text-xs font-mono font-bold bg-orange-600 text-white px-2.5 py-1 rounded-lg">
-                    {d.passcode}
-                  </span>
-                  <div className="text-[10px] text-orange-600 mt-1">Share with pilgrims</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-right">
+                    <span className="text-xs font-mono font-bold bg-orange-600 text-white px-2.5 py-1 rounded-lg">
+                      {d.passcode}
+                    </span>
+                    <div className="text-[10px] text-orange-600 mt-0.5">Share with pilgrims</div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Delete registered Dindi "${d.name}" (${d.passcode})?`)) {
+                        deleteDindi(d.id);
+                      }
+                    }}
+                    className="p-2 rounded-xl bg-red-100 hover:bg-red-200 text-red-700 border border-red-200 transition-all shadow-sm active:scale-95"
+                    title="Delete this Dindi"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
 

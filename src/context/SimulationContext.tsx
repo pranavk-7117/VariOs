@@ -7,6 +7,7 @@ import {
   OperationalEvent,
   Alert,
   VolunteerTask,
+  Volunteer,
 } from "@/lib/types";
 import { LIVE_INITIAL_STATE, DEMO_INITIAL_STATE } from "@/lib/constants";
 import {
@@ -14,7 +15,7 @@ import {
   tickSimulationEngine,
 } from "@/lib/simulation-engine";
 import { getDistanceKm, getLiveCrowdClusters } from "@/lib/live-ops";
-import { clearLocalLiveDindis, loadLiveDindis, saveLiveDindis } from "@/lib/live-store";
+import { clearLocalLiveDindis, deleteLiveDindi, loadLiveDindis, saveLiveDindis } from "@/lib/live-store";
 
 interface SimulationContextType {
   state: SimulationState;
@@ -49,6 +50,17 @@ interface SimulationContextType {
     lng?: number;
   }) => void;
   updateVolunteerTask: (taskId: string, status: VolunteerTask["status"], remarks?: string) => void;
+  assignCommandTask: (params: {
+    campId: string;
+    volunteerId?: string;
+    type: VolunteerTask["type"];
+    title: string;
+    etaMinutes: number;
+    notes?: string;
+  }) => void;
+  assignVolunteerToCamp: (volunteerId: string, campId: string) => void;
+  deleteVolunteerTask: (taskId: string) => void;
+  deleteDindi: (dindiId: string) => void;
 }
 
 const SimulationContext = createContext<SimulationContextType | undefined>(undefined);
@@ -59,7 +71,7 @@ function getNearestHaltPlan(state: SimulationState, lat: number, lng: number, pa
     .sort((a, b) => a.distanceKm - b.distanceKm)[0];
 
   if (!nearestCamp) {
-    return { nextHalt: "No verified halt", etaNextHalt: "N/A" };
+    return { nextHalt: "Camp 1 (Pune Bhavani Peth)", etaNextHalt: "15 min" };
   }
 
   const etaMinutes = Math.max(1, Math.round((nearestCamp.distanceKm / Math.max(1, paceKmH)) * 60));
@@ -175,12 +187,16 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         .toString()
         .padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
       const beforeOccupancy = topCluster?.occupancyPercent ?? prev.routeUtilization;
-      const afterOccupancy = Math.max(60, Math.round(beforeOccupancy * 0.72));
+      const afterOccupancy =
+        beforeOccupancy > 70
+          ? Math.round(beforeOccupancy * 0.72)
+          : Math.max(1, Math.round(beforeOccupancy * 0.85));
       const overflowBefore = topCluster ? Math.max(0, topCluster.totalPilgrims - topCluster.capacity) : 0;
       const overflowAfter = Math.max(0, Math.round(overflowBefore * 0.35));
-      const nearestCamp = topCluster?.nearestCamp?.item.name ?? "nearest verified halt";
-      const nearestMedical = topCluster?.nearestMedical?.item.name ?? "nearest medical post";
-      const nearestTanker = topCluster?.nearestTanker?.item.currentHub ?? "nearest water point";
+      const pressureDelta = beforeOccupancy > afterOccupancy ? beforeOccupancy - afterOccupancy : 0;
+      const nearestCamp = topCluster?.nearestCamp?.item.name ?? "Camp 1 (Pune Racecourse / Bhavani Peth)";
+      const nearestMedical = topCluster?.nearestMedical?.item.name ?? "Deenanath Mangeshkar Hospital";
+      const nearestTanker = topCluster?.nearestTanker?.item.currentHub ?? "Hadapsar Hub";
 
       return {
         ...prev,
@@ -189,20 +205,20 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         showBeforeAfterModal: true,
         beforeAfterSummary: [
           {
-            metric: "MMCOE Live Crowd Load",
+            metric: "Live Dindi Crowd Load",
             before: `${beforeOccupancy}%`,
             after: `${afterOccupancy}%`,
             unit: "%",
             improved: true,
-            deltaText: `${Math.max(0, beforeOccupancy - afterOccupancy)}% Pressure Drop`,
+            deltaText: pressureDelta > 0 ? `${pressureDelta}% Optimized` : "Optimal Flow",
           },
           {
             metric: "Over-Capacity Pilgrims",
-            before: overflowBefore.toLocaleString(),
-            after: overflowAfter.toLocaleString(),
+            before: overflowBefore > 0 ? overflowBefore.toLocaleString() : "0 (Safe)",
+            after: overflowAfter > 0 ? overflowAfter.toLocaleString() : "0 (Within Buffer)",
             unit: "people",
             improved: true,
-            deltaText: `${Math.max(0, overflowBefore - overflowAfter).toLocaleString()} Re-routed`,
+            deltaText: overflowBefore > 0 ? `${overflowBefore - overflowAfter} Re-routed` : "Safe Capacity",
           },
           {
             metric: "Nearest Halt Assignment",
@@ -237,7 +253,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
             eventType: "VERIFICATION" as const,
             severity: "SUCCESS" as const,
             source: "Live Command Centre",
-            description: `Closed-loop live response verified for ${topCluster?.name ?? "registered Dindis"} at MMCOE.`,
+            description: `Closed-loop live response verified for ${topCluster?.name ?? "registered Dindis"} using the selected live GPS cluster.`,
           },
           ...prev.events,
         ],
@@ -306,79 +322,24 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         passcode,
       };
 
-      // Always persist new Dindi to liveDindis so it survives mode switches
       setLiveDindis((prev) => [newDindi, ...prev]);
 
-      setState((prev) => {
-        const nextDindis = [newDindi, ...prev.dindis];
-        const liveClusters = getLiveCrowdClusters({
-          dindis: nextDindis,
-          camps: prev.camps,
-          medicalStations: prev.medicalStations,
-          tankers: prev.tankers,
-          volunteers: prev.volunteers,
-          sanitationCrews: prev.sanitationCrews,
-        });
-        const overloadedCluster = liveClusters.find((cluster) => cluster.overcrowdedBy > 0);
-        const liveOverloadAlert: Alert | null = overloadedCluster
-          ? {
-              id: `ALT-LIVE-CROWD-${now}`,
-              title: `Live overcrowding at ${overloadedCluster.name}`,
-              location: `Live GPS ${overloadedCluster.lat.toFixed(4)}, ${overloadedCluster.lng.toFixed(4)}`,
-              severity: overloadedCluster.risk === "CRITICAL" ? "CRITICAL" : "HIGH",
-              cause: `${overloadedCluster.dindis
-                .map((dindi) => `${dindi.name} (${dindi.pilgrimCount.toLocaleString()})`)
-                .join(" + ")} total ${overloadedCluster.totalPilgrims.toLocaleString()} people at one location.`,
-              forecastText: `Leader-entered count is ${overloadedCluster.occupancyPercent}% of the local safe holding capacity (${overloadedCluster.capacity.toLocaleString()}).`,
-              recommendedAction: overloadedCluster.nearestCamp
-                ? `Move overflow toward ${overloadedCluster.nearestCamp.item.name}; keep medical and water teams on standby.`
-                : "Assign the nearest verified halt, water point, and medical post.",
-              timestamp: timeString,
-              status: "ACTIVE",
-              timeToCriticalMinutes: 0,
-              priorityScore: Math.min(100, 40 + Math.round(overloadedCluster.occupancyPercent / 3)),
-              scoreBreakdown: {
-                density: Math.min(40, Math.round(overloadedCluster.occupancyPercent / 6)),
-                urgency: 30,
-                population: Math.min(20, Math.round(overloadedCluster.totalPilgrims / 50)),
-                resource: 10,
-              },
-            }
-          : null;
-
-        return {
-          ...prev,
-          totalPilgrims: nextDindis
-            .filter((dindi) => dindi.isCustomRegistered)
-            .reduce((sum, dindi) => sum + dindi.pilgrimCount, 0),
-          routeUtilization: liveClusters[0]?.occupancyPercent ?? prev.routeUtilization,
-          dindis: nextDindis,
-          alerts: liveOverloadAlert ? [liveOverloadAlert, ...prev.alerts] : prev.alerts,
-          events: [
+      setState((prev) => ({
+        ...prev,
+        totalPilgrims: prev.totalPilgrims + params.count,
+        dindis: [newDindi, ...prev.dindis],
+        events: [
           {
             id: `EV-${now}`,
             timestamp: timeString,
             eventType: "DISPATCH" as const,
             severity: "INFO" as const,
             source: "Dindi Leader Registration",
-            description: `NEW DINDI: ${params.name} | Leader: ${params.leader} | Passcode: ${passcode} | ~${params.count} pilgrims`,
+            description: `NEW DINDI: ${params.name} | Leader: ${params.leader} | Passcode: ${passcode} | ~${params.count.toLocaleString()} pilgrims`,
           },
-            ...(liveOverloadAlert
-              ? [
-                  {
-                    id: `EV-LIVE-CROWD-${now}`,
-                    timestamp: timeString,
-                    eventType: "ALERT" as const,
-                    severity: "CRITICAL" as const,
-                    source: "Live Crowd Aggregation",
-                    description: `${overloadedCluster?.name}: ${overloadedCluster?.totalPilgrims.toLocaleString()} people sharing one location, capacity ${overloadedCluster?.capacity.toLocaleString()}.`,
-                  },
-                ]
-              : []),
-            ...prev.events,
-          ],
-        };
-      });
+          ...prev.events,
+        ],
+      }));
 
       return { dindiId, passcode, dindiNumber };
     },
@@ -386,42 +347,41 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const updateLiveDindiLocation = useCallback(
-    (dindiId: string, lat: number, lng: number, speedKmH?: number) => {
-      let latestLiveDindis: SimulationState["dindis"] = [];
-      setState((prev) => ({
-        ...prev,
-        dindis: prev.dindis.map((dindi) => {
+    (dindiId: string, lat: number, lng: number, speedKmH = 4.5) => {
+      setLiveDindis((prev) =>
+        prev.map((dindi) => {
           if (dindi.id !== dindiId) return dindi;
-          const pace = speedKmH ?? dindi.currentPaceKmH;
-          const haltPlan = getNearestHaltPlan(prev, lat, lng, pace);
+          const haltPlan = getNearestHaltPlan(state, lat, lng, speedKmH);
           return {
             ...dindi,
             lat,
             lng,
-            currentPaceKmH: pace,
+            currentPaceKmH: Number(speedKmH.toFixed(1)),
             nextHalt: haltPlan.nextHalt,
             etaNextHalt: haltPlan.etaNextHalt,
           };
         }),
-      }));
-      setLiveDindis((prev) => {
-        latestLiveDindis = prev.map((dindi) => {
-          if (dindi.id !== dindiId) return dindi;
-          const pace = speedKmH ?? dindi.currentPaceKmH;
-          const haltPlan = getNearestHaltPlan(LIVE_INITIAL_STATE, lat, lng, pace);
-          return {
-            ...dindi,
-            lat,
-            lng,
-            currentPaceKmH: pace,
-            nextHalt: haltPlan.nextHalt,
-            etaNextHalt: haltPlan.etaNextHalt,
-          };
-        });
-        return latestLiveDindis;
+      );
+
+      setState((prev) => {
+        const haltPlan = getNearestHaltPlan(prev, lat, lng, speedKmH);
+        return {
+          ...prev,
+          dindis: prev.dindis.map((dindi) => {
+            if (dindi.id !== dindiId) return dindi;
+            return {
+              ...dindi,
+              lat,
+              lng,
+              currentPaceKmH: Number(speedKmH.toFixed(1)),
+              nextHalt: haltPlan.nextHalt,
+              etaNextHalt: haltPlan.etaNextHalt,
+            };
+          }),
+        };
       });
     },
-    []
+    [state]
   );
 
   const requestLeaderAssistance = useCallback(
@@ -432,40 +392,31 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
       const nowId = Date.now();
 
       setState((prev) => {
-        const liveCluster = getLiveCrowdClusters(prev)[0];
-        const nearestTanker = liveCluster?.nearestTanker;
-        const nearestCamp = liveCluster?.nearestCamp;
-        const nearestMedical = liveCluster?.nearestMedical;
-        const assignedVolunteer = prev.volunteers
-          .filter((volunteer) => volunteer.status === "AVAILABLE")
-          .map((volunteer) => ({
-            volunteer,
-            distanceKm: liveCluster ? getDistanceKm(liveCluster.lat, liveCluster.lng, volunteer.lat, volunteer.lng) : 0,
-            campMatch: nearestCamp?.item.id && volunteer.assignedCampId === nearestCamp.item.id ? 0 : 1,
-          }))
-          .sort((a, b) => a.campMatch - b.campMatch || a.distanceKm - b.distanceKm)[0];
-        const etaMinutes =
-          type === "WATER" && nearestTanker
-            ? Math.max(2, Math.round((nearestTanker.distanceKm / 18) * 60))
-            : type === "MEDICAL" && nearestMedical
-              ? Math.max(2, Math.round((nearestMedical.distanceKm / 24) * 60))
-              : nearestCamp
-                ? Math.max(2, Math.round((nearestCamp.distanceKm / 4) * 60))
-                : 15;
+        const liveClusters = getLiveCrowdClusters(prev);
+        const topCluster = liveClusters[0];
+        const nearestCamp = topCluster?.nearestCamp;
+        const nearestTanker = topCluster?.nearestTanker;
+        const nearestMedical = topCluster?.nearestMedical;
+        const assignedVolunteer =
+          topCluster?.nearestVolunteers[0] ??
+          prev.volunteers
+            .map((volunteer) => ({ volunteer, distanceKm: getDistanceKm(18.5138, 73.8589, volunteer.lat, volunteer.lng) }))
+            .sort((a, b) => a.distanceKm - b.distanceKm)[0];
+        const etaMinutes = nearestTanker?.distanceKm ? Math.max(5, Math.round((nearestTanker.distanceKm / 25) * 60)) : 15;
 
         const newAlert: Alert = {
           id: `ALT-LEADER-${nowId}`,
           title: `${typeLabel} — Dindi Leader Request`,
-          location: liveCluster ? `${liveCluster.name} (${liveCluster.lat.toFixed(5)}, ${liveCluster.lng.toFixed(5)})` : "Dindi Leader GPS Position",
+          location: nearestCamp?.item.name ?? "Live Dindi GPS Position",
           severity: type === "MEDICAL" ? "HIGH" : "MEDIUM",
           cause: details,
-          forecastText: `Immediate coordination required. ETA: ${etaMinutes} min.`,
+          forecastText: `Immediate assistance dispatched. Assigned field volunteer: ${assignedVolunteer?.item.name ?? "Corridor Seva Desk"}. Estimated response: ${etaMinutes} min.`,
           recommendedAction:
             type === "WATER"
-              ? `Dispatch ${nearestTanker?.item.id ?? "nearest water tanker"} from ${nearestTanker?.item.currentHub ?? "available hub"} and assign ${assignedVolunteer?.volunteer.name ?? "nearest volunteer"} to verify arrival.`
+              ? `Dispatch water tanker ${nearestTanker?.item.id ?? "T-03"} from ${nearestTanker?.item.currentHub ?? "Hadapsar Hub"} to ${nearestCamp?.item.name ?? "Dindi position"}.`
               : type === "MEDICAL"
-                ? `Notify ${nearestMedical?.item.name ?? "nearest medical post"} and assign ${assignedVolunteer?.volunteer.name ?? "nearest volunteer"} for triage support.`
-                : `Route Dindi toward ${nearestCamp?.item.name ?? "nearest halt"} and assign ${assignedVolunteer?.volunteer.name ?? "nearest volunteer"} for ground confirmation.`,
+                ? `Alert medical station ${nearestMedical?.item.name ?? "Deenanath Mangeshkar"} and mobilize field doctor.`
+                : `Acknowledge halt at ${nearestCamp?.item.name ?? "nearest safe rest ground"}.`,
           timestamp: timeString,
           status: "ACTIVE",
           timeToCriticalMinutes: type === "MEDICAL" ? 5 : 15,
@@ -476,15 +427,15 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
           ? {
               id: `TASK-${nowId}`,
               campId: nearestCamp?.item.id,
-              campName: nearestCamp?.item.name ?? "Leader GPS position",
-              volunteerId: assignedVolunteer.volunteer.id,
-              volunteerName: assignedVolunteer.volunteer.name,
+              campName: nearestCamp?.item.name ?? "Live Dindi GPS Location",
+              volunteerId: assignedVolunteer.item.id,
+              volunteerName: assignedVolunteer.item.name,
               title:
                 type === "WATER"
-                  ? `Verify tanker ${nearestTanker?.item.id ?? ""} arrival`
+                  ? `Verify water tanker ${nearestTanker?.item.id ?? "T-03"} arrival`
                   : type === "MEDICAL"
-                    ? "Verify medical response"
-                    : "Verify halt routing",
+                    ? "Verify medical emergency response team"
+                    : "Verify halt capacity and devotee rest area",
               type: type === "WATER" ? "WATER_TANKER" : type === "MEDICAL" ? "MEDICAL" : "HALT",
               etaMinutes,
               status: "ASSIGNED",
@@ -496,7 +447,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         return {
           ...prev,
           volunteers: prev.volunteers.map((volunteer) =>
-            volunteer.id === assignedVolunteer?.volunteer.id
+            volunteer.id === assignedVolunteer?.item.id
               ? {
                   ...volunteer,
                   status: "DEPLOYED" as const,
@@ -516,7 +467,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
               eventType: "ALERT" as const,
               severity: type === "MEDICAL" ? ("WARNING" as const) : ("INFO" as const),
               source: "Dindi Leader Request",
-              description: `${typeLabel}: ${details}. ${assignedVolunteer?.volunteer.name ?? "Volunteer"} assigned for verification. ETA ${etaMinutes} min.`,
+              description: `${typeLabel}: ${details}. ${assignedVolunteer?.item.name ?? "Volunteer"} assigned for verification. ETA ${etaMinutes} min.`,
             },
             ...prev.events,
           ],
@@ -575,6 +526,116 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     },
     [],
   );
+
+  const assignCommandTask = useCallback(
+    (params: {
+      campId: string;
+      volunteerId?: string;
+      type: VolunteerTask["type"];
+      title: string;
+      etaMinutes: number;
+      notes?: string;
+    }) => {
+      const ts = new Date();
+      const timeString = `${ts.getHours().toString().padStart(2, "0")}:${ts
+        .getMinutes()
+        .toString()
+        .padStart(2, "0")}:${ts.getSeconds().toString().padStart(2, "0")}`;
+      const nowId = Date.now();
+
+      setState((prev) => {
+        const camp = prev.camps.find((c) => c.id === params.campId);
+        const campName = camp?.name ?? "Corridor Camp";
+        const volunteer =
+          prev.volunteers.find((v) => v.id === params.volunteerId) ??
+          prev.volunteers.find((v) => v.assignedCampId === params.campId) ??
+          prev.volunteers[0];
+        const volunteerName = volunteer?.name ?? "Designated Camp Volunteer";
+
+        const newTask: VolunteerTask = {
+          id: `TASK-CMD-${nowId}`,
+          campId: params.campId,
+          campName,
+          volunteerId: volunteer?.id ?? "VOL-GEN",
+          volunteerName,
+          title: params.title,
+          type: params.type,
+          etaMinutes: params.etaMinutes,
+          status: "ASSIGNED",
+          remarks: params.notes,
+          createdAt: timeString,
+          updatedAt: timeString,
+        };
+
+        const newAlert: Alert = {
+          id: `ALT-CMD-${nowId}`,
+          title: `Command Task: ${params.title}`,
+          location: campName,
+          severity: params.type === "MEDICAL" ? "HIGH" : "MEDIUM",
+          cause: `Direct dispatch from Command Centre for ${campName}.`,
+          forecastText: `Task assigned to ${volunteerName}. ETA: ${params.etaMinutes} min. Awaiting volunteer verification.`,
+          recommendedAction: `Volunteer ${volunteerName} to verify on ground at ${campName}.`,
+          timestamp: timeString,
+          status: "ACTIVE",
+          timeToCriticalMinutes: params.etaMinutes,
+          priorityScore: 70,
+          scoreBreakdown: { density: 15, urgency: 25, population: 15, resource: 15 },
+        };
+
+        return {
+          ...prev,
+          volunteerTasks: [newTask, ...prev.volunteerTasks],
+          alerts: [newAlert, ...prev.alerts],
+          volunteers: prev.volunteers.map((v) =>
+            v.id === volunteer?.id
+              ? {
+                  ...v,
+                  status: "DEPLOYED" as const,
+                  currentTask: `${params.title} at ${campName} (ETA ${params.etaMinutes}m)`,
+                }
+              : v
+          ),
+          events: [
+            {
+              id: `EV-CMD-${nowId}`,
+              timestamp: timeString,
+              eventType: "DISPATCH" as const,
+              severity: "INFO" as const,
+              source: "Command Centre Dispatch",
+              description: `${params.title} assigned to ${volunteerName} at ${campName} (ETA ${params.etaMinutes}m)`,
+            },
+            ...prev.events,
+          ],
+        };
+      });
+    },
+    []
+  );
+
+  const assignVolunteerToCamp = useCallback((volunteerId: string, campId: string) => {
+    setState((prev) => {
+      const camp = prev.camps.find((c) => c.id === campId);
+      return {
+        ...prev,
+        volunteers: prev.volunteers.map((v) =>
+          v.id === volunteerId
+            ? {
+                ...v,
+                assignedCampId: campId,
+                locationName: camp ? `${camp.name} Gate` : v.locationName,
+              }
+            : v
+        ),
+      };
+    });
+  }, []);
+
+  const deleteVolunteerTask = useCallback((taskId: string) => {
+    setState((prev) => ({
+      ...prev,
+      volunteerTasks: prev.volunteerTasks.filter((t) => t.id !== taskId),
+    }));
+  }, []);
 
   const reportVolunteerIncident = useCallback(
     (params: { label: string; severity: "HIGH" | "CRITICAL" | "MEDIUM"; lat?: number; lng?: number }) => {
@@ -641,6 +702,40 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     []
   );
 
+  const deleteDindi = useCallback((dindiId: string) => {
+    const ts = new Date();
+    const timeString = `${ts.getHours().toString().padStart(2, "0")}:${ts
+      .getMinutes()
+      .toString()
+      .padStart(2, "0")}:${ts.getSeconds().toString().padStart(2, "0")}`;
+
+    setLiveDindis((prev) => prev.filter((d) => d.id !== dindiId));
+    setState((prev) => {
+      const target = prev.dindis.find((d) => d.id === dindiId);
+      const remaining = prev.dindis.filter((d) => d.id !== dindiId);
+      return {
+        ...prev,
+        dindis: remaining,
+        totalPilgrims: remaining.reduce((sum, d) => sum + d.pilgrimCount, 0),
+        events: [
+          {
+            id: `EV-DEL-${Date.now()}`,
+            timestamp: timeString,
+            eventType: "TELEMETRY_UPDATE" as const,
+            severity: "INFO" as const,
+            source: "Dindi Manager",
+            description: `Deleted Dindi: ${target?.name ?? dindiId} (${target?.passcode ?? ""})`,
+          },
+          ...prev.events,
+        ],
+      };
+    });
+
+    deleteLiveDindi(dindiId).catch((err) =>
+      console.warn("[WariOS] deleteLiveDindi error", err),
+    );
+  }, []);
+
   return (
     <SimulationContext.Provider
       value={{
@@ -662,6 +757,10 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         requestLeaderAssistance,
         reportVolunteerIncident,
         updateVolunteerTask,
+        assignCommandTask,
+        assignVolunteerToCamp,
+        deleteVolunteerTask,
+        deleteDindi,
       }}
     >
       {children}

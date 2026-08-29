@@ -23,7 +23,6 @@ export interface LiveCrowdCluster {
   nearestSanitationCrew?: DistanceTagged<SanitationCrew>;
 }
 
-const LIVE_HOLDING_CAPACITY = 400;
 const CO_LOCATION_PRECISION = 3;
 
 export function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -76,8 +75,10 @@ export function getLiveCrowdClusters(params: {
   return Array.from(groups.entries())
     .map(([key, dindis]) => {
       const totalPilgrims = dindis.reduce((sum, dindi) => sum + dindi.pilgrimCount, 0);
-      const occupancyPercent = Math.round((totalPilgrims / LIVE_HOLDING_CAPACITY) * 100);
       const [lat, lng] = key.split(",").map(Number);
+      const nearestCamp = nearest(lat, lng, params.camps);
+      const holdingCapacity = nearestCamp?.item.capacity ?? 40000;
+      const occupancyPercent = Math.round((totalPilgrims / holdingCapacity) * 100);
       const clusterName =
         dindis.length > 1
           ? `${dindis.map((dindi) => dindi.name).join(" + ")} co-located`
@@ -90,11 +91,11 @@ export function getLiveCrowdClusters(params: {
         lng,
         dindis,
         totalPilgrims,
-        capacity: LIVE_HOLDING_CAPACITY,
+        capacity: holdingCapacity,
         occupancyPercent,
-        overcrowdedBy: Math.max(0, totalPilgrims - LIVE_HOLDING_CAPACITY),
+        overcrowdedBy: Math.max(0, totalPilgrims - holdingCapacity),
         risk: riskForOccupancy(occupancyPercent),
-        nearestCamp: nearest(lat, lng, params.camps),
+        nearestCamp,
         nearestMedical: nearest(lat, lng, params.medicalStations),
         nearestTanker: nearest(
           lat,

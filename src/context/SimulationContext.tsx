@@ -8,8 +8,16 @@ import {
   Alert,
   VolunteerTask,
   Volunteer,
+  Dindi,
+  Camp,
 } from "@/lib/types";
-import { LIVE_INITIAL_STATE, DEMO_INITIAL_STATE } from "@/lib/constants";
+import {
+  LIVE_INITIAL_STATE,
+  DEMO_INITIAL_STATE,
+  LIVE_SUPPORT_CAMPS,
+  LIVE_SUPPORT_TANKERS,
+  LIVE_SUPPORT_VOLUNTEERS,
+} from "@/lib/constants";
 import {
   executeDispatchAction,
   tickSimulationEngine,
@@ -102,8 +110,8 @@ function computeLiveCamps(dindis: Dindi[], baseCamps: Camp[]): Camp[] {
       waterBurnRateLitersPerMin: Math.max(20, Math.round(assignedPilgrims * 0.05)),
       minutesToWaterDepletion: 360,
       foodStockPercent: 92,
-      shelterStatus: occupancyPercent > 90 ? "ATTENTION" : "STABLE",
-      status: occupancyPercent > 90 ? "ATTENTION" : "NORMAL",
+      shelterStatus: occupancyPercent > 100 ? ("OVERFLOW" as const) : ("STABLE" as const),
+      status: occupancyPercent > 90 ? ("ATTENTION" as const) : ("NORMAL" as const),
     };
   });
 }
@@ -481,8 +489,20 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
             }
           : null;
 
+        const matchingTankerId = nearestTanker?.item.id;
+
         return {
           ...prev,
+          tankers: prev.tankers.map((tanker) =>
+            type === "WATER" && (tanker.id === matchingTankerId || (!matchingTankerId && tanker.status === "AVAILABLE"))
+              ? {
+                  ...tanker,
+                  status: "EN_ROUTE" as const,
+                  assignedCampId: nearestCamp?.item.name ?? "Live Dindi Location",
+                  etaMinutes,
+                }
+              : tanker
+          ),
           volunteers: prev.volunteers.map((volunteer) =>
             volunteer.id === assignedVolunteer?.item.id
               ? {
@@ -533,6 +553,20 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         return {
           ...prev,
           volunteerTasks: nextTasks,
+          tankers: prev.tankers.map((tanker) =>
+            task.type === "WATER_TANKER" && tanker.assignedCampId?.includes(task.campName || "")
+              ? {
+                  ...tanker,
+                  status: status === "VERIFIED" ? ("AVAILABLE" as const) : tanker.status,
+                  assignedCampId: status === "VERIFIED" ? undefined : tanker.assignedCampId,
+                }
+              : tanker
+          ),
+          camps: prev.camps.map((camp) =>
+            task.type === "WATER_TANKER" && (camp.id === task.campId || camp.name === task.campName) && status === "VERIFIED"
+              ? { ...camp, waterStockPercent: 100, minutesToWaterDepletion: 480 }
+              : camp
+          ),
           volunteers: prev.volunteers.map((volunteer) =>
             volunteer.id === task.volunteerId && (status === "VERIFIED" || status === "REJECTED")
               ? { ...volunteer, status: "AVAILABLE" as const, currentTask: undefined }
@@ -589,6 +623,9 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
           prev.volunteers[0];
         const volunteerName = volunteer?.name ?? "Designated Camp Volunteer";
 
+        // Find nearest available tanker to this camp if it's a water dispatch
+        const availableTanker = prev.tankers.find((t) => t.status === "AVAILABLE");
+
         const newTask: VolunteerTask = {
           id: `TASK-CMD-${nowId}`,
           campId: params.campId,
@@ -623,6 +660,16 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
           ...prev,
           volunteerTasks: [newTask, ...prev.volunteerTasks],
           alerts: [newAlert, ...prev.alerts],
+          tankers: prev.tankers.map((t) =>
+            params.type === "WATER_TANKER" && t.id === availableTanker?.id
+              ? {
+                  ...t,
+                  status: "EN_ROUTE" as const,
+                  assignedCampId: campName,
+                  etaMinutes: params.etaMinutes,
+                }
+              : t
+          ),
           volunteers: prev.volunteers.map((v) =>
             v.id === volunteer?.id
               ? {
@@ -646,7 +693,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         };
       });
     },
-    []
+    [],
   );
 
   const assignVolunteerToCamp = useCallback((volunteerId: string, campId: string) => {

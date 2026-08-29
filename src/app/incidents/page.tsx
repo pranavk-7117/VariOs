@@ -13,6 +13,10 @@ import {
   HeartHandshake,
   Users,
   Compass,
+  Utensils,
+  Truck,
+  Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import { useSimulation } from "@/context/SimulationContext";
 import { PriorityGauge } from "@/components/common/PriorityGauge";
@@ -27,6 +31,8 @@ export default function IncidentsPage() {
     dispatchTankerT03,
     deployVolunteersCP4,
     openBackupShelterB,
+    applyLiveClusterMitigation,
+    rerouteLiveDindi,
     isMitigated,
   } = useSimulation();
 
@@ -36,75 +42,239 @@ export default function IncidentsPage() {
   const liveClusters = getLiveCrowdClusters(state);
 
   if (!state.isSimulating) {
+    const isMitigatedLive = state.isMitigated || state.volunteerTasks.some((t) => t.id.startsWith("TASK-MIT"));
+    const allVerified =
+      state.volunteerTasks.length > 0 &&
+      state.volunteerTasks.every((t) => t.status === "VERIFIED");
+
     return (
-      <div className="space-y-6 animate-fadeIn">
-        <div className="card-base p-6">
-          <h1 className="text-xl font-bold text-wari-textPrimary">Live Incidents</h1>
-          <p className="text-sm text-wari-textSecond mt-1">
-            Only real leader registrations, GPS crowd aggregation, and field reports are shown in Live Mode.
-          </p>
+      <div className="space-y-6 animate-fadeIn pb-12">
+        {/* Header */}
+        <div className="card-base p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <h1 className="text-xl font-bold text-wari-textPrimary">Live Incidents & AI Operations Triage</h1>
+            </div>
+            <p className="text-sm text-wari-textSecond mt-1">
+              Real-time GPS crowd aggregation, resource deficit calculation & automated multi-agency dispatch
+            </p>
+          </div>
+          <span className="text-xs font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 px-3 py-1.5 rounded-full self-start sm:self-auto">
+            LIVE TELEMETRY
+          </span>
         </div>
 
-        {liveClusters.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {liveClusters.map((cluster) => (
-              <div key={cluster.id} className="card-base p-5 border-2 border-red-200 bg-red-50/40 space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <span className="text-xs font-bold text-red-700 uppercase">Live Crowd Pressure</span>
-                    <h2 className="text-lg font-bold text-wari-textPrimary">{cluster.name}</h2>
-                    <p className="text-xs text-wari-textMuted">
-                      GPS {cluster.lat.toFixed(4)}, {cluster.lng.toFixed(4)}
-                    </p>
-                  </div>
-                  <span className="badge-critical">{cluster.risk}</span>
-                </div>
+        {/* Live Crowd Pressure Clusters & Incident Triage */}
+        {liveClusters.length > 0 ? (
+          <div className="space-y-6">
+            {liveClusters.map((cluster) => {
+              const targetCamp = cluster.nearestCamp?.item;
+              const isOvercrowded = cluster.occupancyPercent >= 100;
+              const waterDemandL = cluster.totalPilgrims * 3;
+              const foodMealsDemand = cluster.totalPilgrims;
+              const sanitationPodsDemand = Math.max(10, Math.round(cluster.totalPilgrims / 50));
+              const availableTanker = state.tankers.find((t) => t.status === "AVAILABLE");
+              const availableFood = state.foodSupplies?.find((f) => f.status === "AVAILABLE");
+              const availableSanitation = state.sanitationCrews.find((s) => s.status === "AVAILABLE");
+              const largestDindi = [...cluster.dindis].sort((a, b) => b.pilgrimCount - a.pilgrimCount)[0];
+              const backupCamp = state.camps.find((c) => c.id !== targetCamp?.id && c.occupancyPercent < 60) ?? state.camps[1];
 
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="bg-white rounded-xl border border-wari-cardBorder p-3">
-                    <span className="text-wari-textMuted block">People</span>
-                    <span className="font-black text-wari-textPrimary">{cluster.totalPilgrims.toLocaleString()}</span>
-                  </div>
-                  <div className="bg-white rounded-xl border border-wari-cardBorder p-3">
-                    <span className="text-wari-textMuted block">Capacity</span>
-                    <span className="font-black text-red-700">{cluster.occupancyPercent}%</span>
-                  </div>
-                  <div className="bg-white rounded-xl border border-wari-cardBorder p-3">
-                    <span className="text-wari-textMuted block">Overflow</span>
-                    <span className="font-black text-red-700">{cluster.overcrowdedBy.toLocaleString()}</span>
-                  </div>
-                </div>
+              return (
+                <div
+                  key={cluster.id}
+                  className={`card-base p-6 border-2 space-y-5 transition-all ${
+                    allVerified
+                      ? "border-emerald-400 bg-emerald-50/50"
+                      : isOvercrowded
+                      ? "border-red-400 bg-red-50/40 shadow-md"
+                      : "border-amber-300 bg-amber-50/30"
+                  }`}
+                >
+                  {/* Status Banner */}
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-wari-cardBorder">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-bold text-red-700 uppercase tracking-wide">
+                          🚨 Incident #INC-LIVE-{cluster.id}
+                        </span>
+                        <span className={isOvercrowded ? "badge-critical" : "badge-high"}>
+                          {isOvercrowded ? "CRITICAL OVERCROWDING" : "CROWD SURGE"}
+                        </span>
+                      </div>
+                      <h2 className="text-lg font-bold text-wari-textPrimary">{cluster.name}</h2>
+                      <p className="text-xs text-wari-textMuted">
+                        GPS {cluster.lat.toFixed(4)}°N, {cluster.lng.toFixed(4)}°E • Sector: {targetCamp?.name ?? "Corridor Sector"}
+                      </p>
+                    </div>
 
-                <div className="rounded-xl bg-white border border-wari-cardBorder p-4 text-xs text-wari-textSecond space-y-1">
-                  <p><strong>Dindis together:</strong> {cluster.dindis.map((dindi) => `${dindi.name} (${dindi.pilgrimCount.toLocaleString()})`).join(", ")}</p>
-                  <p><strong>Nearest halt:</strong> {cluster.nearestCamp ? `${cluster.nearestCamp.item.name} (${cluster.nearestCamp.distanceKm} km)` : "No halt registered"}</p>
-                  <p><strong>Recommended action:</strong> Move overflow, stage water, and keep medical standby at the nearest verified facility.</p>
+                    <div className="flex items-center gap-2 self-start md:self-auto">
+                      {allVerified ? (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>Problem Solved & Verified</span>
+                        </div>
+                      ) : isMitigatedLive ? (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-100 border border-blue-300 text-blue-800 text-xs font-bold animate-pulse">
+                          <Clock className="w-4 h-4 text-blue-600" />
+                          <span>Mitigation Dispatched — Awaiting Verification in /volunteer</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => applyLiveClusterMitigation(targetCamp?.id)}
+                          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 hover:from-red-700 hover:to-orange-700 active:scale-95 text-white font-bold text-xs shadow-md flex items-center gap-2 transition-all"
+                        >
+                          <Zap className="w-4 h-4 text-yellow-300 animate-bounce" />
+                          <span>⚡ Apply AI Multi-Resource Mitigation & Dispatch (1-Click)</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 4 Metrics Cards */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                    <div className="bg-white rounded-xl border border-wari-cardBorder p-3.5 shadow-sm">
+                      <span className="text-wari-textMuted block font-medium">Devotees Present</span>
+                      <span className="font-black text-base text-wari-textPrimary">{cluster.totalPilgrims.toLocaleString()}</span>
+                      <span className="text-[10px] text-red-600 block font-semibold mt-0.5">
+                        +{cluster.overcrowdedBy.toLocaleString()} Overflow
+                      </span>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-wari-cardBorder p-3.5 shadow-sm">
+                      <span className="text-wari-textMuted block font-medium">Water Reserves Load</span>
+                      <span className="font-black text-base text-blue-700">{waterDemandL.toLocaleString()} L</span>
+                      <span className="text-[10px] text-red-600 font-bold block mt-0.5">
+                        {allVerified ? "100% Stock (Refilled)" : "15% Stock — CRITICAL DEFICIT"}
+                      </span>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-wari-cardBorder p-3.5 shadow-sm">
+                      <span className="text-wari-textMuted block font-medium">Food / Prasad Load</span>
+                      <span className="font-black text-base text-amber-700">{foodMealsDemand.toLocaleString()} Meals</span>
+                      <span className="text-[10px] text-red-600 font-bold block mt-0.5">
+                        {allVerified ? "100% Stock (Refilled)" : "18% Stock — CRITICAL DEFICIT"}
+                      </span>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-wari-cardBorder p-3.5 shadow-sm">
+                      <span className="text-wari-textMuted block font-medium">Sanitation Demand</span>
+                      <span className="font-black text-base text-teal-700">{sanitationPodsDemand} Pods</span>
+                      <span className="text-[10px] text-red-600 font-bold block mt-0.5">
+                        {allVerified ? "24 Pods Serviced" : "Critical Overflow"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* AI Multi-Resource Recommendations List */}
+                  <div className="rounded-xl bg-white border border-wari-cardBorder p-4 text-xs space-y-3 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-wari-orange" />
+                      <span className="font-bold text-wari-textPrimary">AI Operations Mitigation Recommendations:</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                      <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1">
+                        <div className="font-bold text-blue-900 flex items-center gap-1.5">
+                          <Droplets className="w-3.5 h-3.5 text-blue-600" />
+                          <span>1. Water Supply Reinforcement</span>
+                        </div>
+                        <p className="text-[11px] text-blue-800">
+                          Dispatch nearest Water Tanker <strong>{availableTanker?.id ?? "LIVE-WATER-PUNE-01"}</strong> ({(availableTanker?.capacityLiters ?? 10000).toLocaleString()}L) from {availableTanker?.currentHub ?? "Pune Hub"} to {targetCamp?.name ?? "Camp 1"}.
+                        </p>
+                      </div>
+
+                      <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-1">
+                        <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                          <Utensils className="w-3.5 h-3.5 text-amber-600" />
+                          <span>2. Anna Dan / Prasad Kitchen Dispatch</span>
+                        </div>
+                        <p className="text-[11px] text-amber-800">
+                          Mobilize Mobile Kitchen <strong>{availableFood?.name ?? "Alandi-Pune Central Anna Dan Kitchen"}</strong> ({(availableFood?.mealsCapacity ?? 50000).toLocaleString()} meals) to {targetCamp?.name ?? "Camp 1"}.
+                        </p>
+                      </div>
+
+                      <div className="p-3 bg-teal-50/70 border border-teal-200 rounded-xl space-y-1">
+                        <div className="font-bold text-teal-900 flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5 text-teal-600" />
+                          <span>3. Sanitation Squad Deployment</span>
+                        </div>
+                        <p className="text-[11px] text-teal-800">
+                          Deploy <strong>{availableSanitation?.name ?? "Pune Municipal Bio-Toilet Squad 1"}</strong> ({availableSanitation?.mobilePodsCount ?? 24} mobile pods) to handle devotee surge.
+                        </p>
+                      </div>
+
+                      <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-1">
+                        <div className="font-bold text-purple-900 flex items-center gap-1.5">
+                          <RefreshCw className="w-3.5 h-3.5 text-purple-600" />
+                          <span>4. Overflow Dindi Rerouting</span>
+                        </div>
+                        <p className="text-[11px] text-purple-800">
+                          Divert <strong>{largestDindi?.name ?? "Test3"}</strong> (~{(largestDindi?.pilgrimCount ?? 50000).toLocaleString()} devotees) towards <strong>{backupCamp?.name ?? "Camp 2 (Hadapsar Transit Yard)"}</strong> ({backupCamp?.occupancyPercent}% occupied).
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Quick 1-tap dispatch bar */}
+                    {!allVerified && !isMitigatedLive && (
+                      <div className="pt-2 flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => applyLiveClusterMitigation(targetCamp?.id)}
+                          className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                        >
+                          <Zap className="w-3.5 h-3.5 text-yellow-300" />
+                          <span>Execute Full AI Mitigation Plan</span>
+                        </button>
+                        {largestDindi && backupCamp && (
+                          <button
+                            onClick={() => rerouteLiveDindi(largestDindi.id, backupCamp.id)}
+                            className="px-3 py-2 rounded-xl bg-purple-50 border border-purple-200 hover:bg-purple-100 text-purple-800 font-bold text-xs flex items-center gap-1.5"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5 text-purple-600" />
+                            <span>Reroute {largestDindi.name} to {backupCamp.name}</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        )}
+        ) : null}
 
+        {/* Live Alert Feed */}
         {state.alerts.length > 0 ? (
-          <div className="card-base p-5 space-y-3">
-            <h2 className="text-sm font-bold text-wari-textPrimary">Live Alert Feed</h2>
-            {state.alerts.map((alert) => (
-              <div key={alert.id} className="rounded-xl border border-wari-cardBorder bg-wari-pageBg p-4 text-xs">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-bold text-wari-textPrimary">{alert.title}</span>
-                  <span className={alert.severity === "CRITICAL" ? "badge-critical" : "badge-high"}>{alert.severity}</span>
+          <div className="card-base p-6 space-y-4">
+            <h2 className="text-sm font-bold text-wari-textPrimary uppercase tracking-wider">
+              Live Alert & Operational Triage Feed ({state.alerts.length})
+            </h2>
+            <div className="space-y-3">
+              {state.alerts.map((alert) => (
+                <div key={alert.id} className="rounded-xl border border-wari-cardBorder bg-wari-pageBg p-4 text-xs space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-bold text-sm text-wari-textPrimary">{alert.title}</span>
+                    <span className={alert.status === "RESOLVED" ? "badge-success" : alert.severity === "CRITICAL" ? "badge-critical" : "badge-high"}>
+                      {alert.status === "RESOLVED" ? "RESOLVED" : alert.severity}
+                    </span>
+                  </div>
+                  <p className="text-wari-textSecond">{alert.cause}</p>
+                  <p className="text-wari-orange font-semibold">{alert.recommendedAction}</p>
+                  {alert.forecastText && (
+                    <p className="text-[11px] text-wari-textMuted">{alert.forecastText}</p>
+                  )}
                 </div>
-                <p className="text-wari-textSecond mt-1">{alert.cause}</p>
-                <p className="text-wari-orange font-semibold mt-2">{alert.recommendedAction}</p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        ) : (
+        ) : liveClusters.length === 0 ? (
           <div className="card-base p-8 text-center border-2 border-dashed border-wari-cardBorder">
-            <p className="text-sm font-bold text-wari-textPrimary">No live incidents yet</p>
-            <p className="text-xs text-wari-textMuted mt-1">Register Dindis or submit a leader quick action to create real alerts.</p>
+            <p className="text-sm font-bold text-wari-textPrimary">No live incidents detected</p>
+            <p className="text-xs text-wari-textMuted mt-1">
+              Registered Dindis and corridor resources are currently operating within safe capacity limits.
+            </p>
           </div>
-        )}
+        ) : null}
       </div>
     );
   }

@@ -70,6 +70,8 @@ interface SimulationContextType {
   assignVolunteerToCamp: (volunteerId: string, campId: string) => void;
   deleteVolunteerTask: (taskId: string) => void;
   deleteDindi: (dindiId: string) => void;
+  applyLiveClusterMitigation: (clusterId?: string) => void;
+  rerouteLiveDindi: (dindiId: string, targetCampId: string) => void;
 }
 
 const SimulationContext = createContext<SimulationContextType | undefined>(undefined);
@@ -90,11 +92,15 @@ function getNearestHaltPlan(state: SimulationState, lat: number, lng: number, pa
   };
 }
 
-function computeLiveCamps(dindis: Dindi[], baseCamps: Camp[]): Camp[] {
+function computeLiveCamps(dindis: Dindi[], baseCamps: Camp[], tasks: VolunteerTask[] = []): Camp[] {
   return baseCamps.map((camp) => {
     const assignedPilgrims = dindis
       .filter((d) => d.isCustomRegistered)
       .filter((d) => {
+        // If explicitly rerouted to another camp, count towards that target camp
+        if ((d as any).reroutedCampId) {
+          return (d as any).reroutedCampId === camp.id;
+        }
         const closest = baseCamps
           .map((c) => ({ c, dist: getDistanceKm(d.lat, d.lng, c.lat, c.lng) }))
           .sort((a, b) => a.dist - b.dist)[0];
@@ -102,17 +108,60 @@ function computeLiveCamps(dindis: Dindi[], baseCamps: Camp[]): Camp[] {
       })
       .reduce((sum, d) => sum + d.pilgrimCount, 0);
 
-    const occupancyPercent = Math.min(100, Math.round((assignedPilgrims / camp.capacity) * 100));
+    const occupancyPercent = Math.min(200, Math.round((assignedPilgrims / camp.capacity) * 100));
+
+    // Check verification status from volunteer tasks
+    const hasPendingWater = tasks.some(
+      (t) => t.type === "WATER_TANKER" && (t.campId === camp.id || t.campName?.includes(camp.name) || camp.name.includes(t.campName || "")) && t.status !== "VERIFIED"
+    );
+    const hasVerifiedWater = tasks.some(
+      (t) => t.type === "WATER_TANKER" && (t.campId === camp.id || t.campName?.includes(camp.name) || camp.name.includes(t.campName || "")) && t.status === "VERIFIED"
+    );
+    const hasPendingFood = tasks.some(
+      (t) => t.type === "FOOD_SUPPLY" && (t.campId === camp.id || t.campName?.includes(camp.name) || camp.name.includes(t.campName || "")) && t.status !== "VERIFIED"
+    );
+    const hasVerifiedFood = tasks.some(
+      (t) => t.type === "FOOD_SUPPLY" && (t.campId === camp.id || t.campName?.includes(camp.name) || camp.name.includes(t.campName || "")) && t.status === "VERIFIED"
+    );
+
+    let waterStockPercent = 95;
+    let foodStockPercent = 92;
+    let minutesToWaterDepletion = 360;
+    let status: "NORMAL" | "ATTENTION" | "HIGH" | "CRITICAL" = "NORMAL";
+
+    if (occupancyPercent >= 100) {
+      // Overcrowded overflow (e.g. 52,100 pilgrims on 40,000 capacity = 130% overflow)
+      waterStockPercent = hasVerifiedWater ? 100 : 15; // RED
+      foodStockPercent = hasVerifiedFood ? 100 : 18;   // RED
+      minutesToWaterDepletion = hasVerifiedWater ? 480 : 18;
+      status = hasVerifiedWater && hasVerifiedFood ? "NORMAL" : "CRITICAL";
+    } else if (hasPendingWater || hasPendingFood) {
+      waterStockPercent = hasPendingWater ? 15 : (hasVerifiedWater ? 100 : 85);
+      foodStockPercent = hasPendingFood ? 18 : (hasVerifiedFood ? 100 : 85);
+      minutesToWaterDepletion = hasPendingWater ? 20 : 300;
+      status = "CRITICAL";
+    } else if (occupancyPercent > 50) {
+      waterStockPercent = hasVerifiedWater ? 100 : Math.max(35, 95 - Math.round(occupancyPercent * 0.45));
+      foodStockPercent = hasVerifiedFood ? 100 : Math.max(40, 92 - Math.round(occupancyPercent * 0.4));
+      minutesToWaterDepletion = Math.max(60, 360 - occupancyPercent * 2);
+      status = occupancyPercent > 80 ? "ATTENTION" : "NORMAL";
+    } else {
+      waterStockPercent = hasVerifiedWater ? 100 : 95;
+      foodStockPercent = hasVerifiedFood ? 100 : 92;
+      minutesToWaterDepletion = 360;
+      status = "NORMAL";
+    }
+
     return {
       ...camp,
       currentOccupancy: assignedPilgrims,
       occupancyPercent,
-      waterStockPercent: 95,
-      waterBurnRateLitersPerMin: Math.max(20, Math.round(assignedPilgrims * 0.05)),
-      minutesToWaterDepletion: 360,
-      foodStockPercent: 92,
+      waterStockPercent,
+      waterBurnRateLitersPerMin: Math.max(20, Math.round(assignedPilgrims * 0.08)),
+      minutesToWaterDepletion,
+      foodStockPercent,
       shelterStatus: occupancyPercent > 100 ? ("OVERFLOW" as const) : ("STABLE" as const),
-      status: occupancyPercent > 90 ? ("ATTENTION" as const) : ("NORMAL" as const),
+      status,
     };
   });
 }
@@ -138,7 +187,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
               ...prev,
               dindis: parsed,
               totalPilgrims: parsed.reduce((sum, dindi) => sum + dindi.pilgrimCount, 0),
-              camps: computeLiveCamps(parsed, LIVE_SUPPORT_CAMPS),
+              camps: computeLiveCamps(parsed, LIVE_SUPPORT_CAMPS, prev.volunteerTasks),
             };
           });
           setHasLoadedLiveStore(true);
@@ -798,6 +847,204 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     }));
   }, []);
 
+  const rerouteLiveDindi = useCallback((dindiId: string, targetCampId: string) => {
+    const ts = new Date();
+    const timeString = `${ts.getHours().toString().padStart(2, "0")}:${ts.getMinutes().toString().padStart(2, "0")}:${ts.getSeconds().toString().padStart(2, "0")}`;
+
+    setState((prev) => {
+      const targetCamp = prev.camps.find((c) => c.id === targetCampId);
+      const targetCampName = targetCamp?.name ?? targetCampId;
+      const updatedDindis = prev.dindis.map((d) =>
+        d.id === dindiId
+          ? ({ ...d, reroutedCampId: targetCampId } as Dindi)
+          : d
+      );
+      const updatedLiveDindis = liveDindis.map((d) =>
+        d.id === dindiId
+          ? ({ ...d, reroutedCampId: targetCampId } as Dindi)
+          : d
+      );
+      setLiveDindis(updatedLiveDindis);
+
+      const dindiObj = prev.dindis.find((d) => d.id === dindiId);
+      const updatedCamps = computeLiveCamps(updatedDindis, LIVE_SUPPORT_CAMPS, prev.volunteerTasks);
+
+      return {
+        ...prev,
+        dindis: updatedDindis,
+        camps: updatedCamps,
+        events: [
+          {
+            id: `EV-REROUTE-${Date.now()}`,
+            timestamp: timeString,
+            eventType: "DISPATCH" as const,
+            severity: "INFO" as const,
+            source: "AI Operations Copilot",
+            description: `Rerouted ${dindiObj?.name ?? "Dindi"} (~${dindiObj?.pilgrimCount.toLocaleString()} pilgrims) to ${targetCampName} to alleviate pressure.`,
+          },
+          ...prev.events,
+        ],
+      };
+    });
+  }, [liveDindis]);
+
+  const applyLiveClusterMitigation = useCallback((clusterCampId?: string) => {
+    const ts = new Date();
+    const timeString = `${ts.getHours().toString().padStart(2, "0")}:${ts.getMinutes().toString().padStart(2, "0")}:${ts.getSeconds().toString().padStart(2, "0")}`;
+    const nowId = Date.now();
+
+    setState((prev) => {
+      // 1. Identify overloaded camp
+      const targetCamp =
+        prev.camps.find((c) => c.id === clusterCampId) ??
+        prev.camps.find((c) => c.occupancyPercent >= 100) ??
+        prev.camps[0];
+
+      const targetCampName = targetCamp?.name ?? "Camp 1 (Pune Racecourse / Bhavani Peth)";
+      const targetCampId = targetCamp?.id ?? "CAMP-01";
+
+      // 2. Find nearest available water tanker
+      const nearestTanker = prev.tankers.find((t) => t.status === "AVAILABLE") ?? prev.tankers[0];
+
+      // 3. Find nearest available food kitchen
+      const nearestFood = prev.foodSupplies?.find((f) => f.status === "AVAILABLE") ?? prev.foodSupplies?.[0];
+
+      // 4. Find nearest available sanitation squad
+      const nearestSanitation = prev.sanitationCrews.find((s) => s.status === "AVAILABLE") ?? prev.sanitationCrews[0];
+
+      // 5. Find designated volunteer
+      const designatedVolunteer =
+        prev.volunteers.find((v) => v.assignedCampId === targetCampId) ??
+        prev.volunteers.find((v) => v.status === "AVAILABLE") ??
+        prev.volunteers[0];
+
+      // 6. Find next backup camp with spare capacity (e.g. Camp 2 - Hadapsar)
+      const backupCamp =
+        prev.camps.find((c) => c.id !== targetCampId && c.occupancyPercent < 60) ??
+        prev.camps[1] ??
+        prev.camps[0];
+
+      // 7. Find largest Dindi near overloaded camp to reroute
+      const dindisAtCamp = prev.dindis.filter((d) => d.isCustomRegistered);
+      const largestDindi = [...dindisAtCamp].sort((a, b) => b.pilgrimCount - a.pilgrimCount)[0];
+
+      const updatedDindis = largestDindi && backupCamp
+        ? prev.dindis.map((d) =>
+            d.id === largestDindi.id ? ({ ...d, reroutedCampId: backupCamp.id } as Dindi) : d
+          )
+        : prev.dindis;
+
+      if (largestDindi && backupCamp) {
+        setLiveDindis((curr) =>
+          curr.map((d) =>
+            d.id === largestDindi.id ? ({ ...d, reroutedCampId: backupCamp.id } as Dindi) : d
+          )
+        );
+      }
+
+      // 8. Generate volunteer tasks for ground verification
+      const newTasks: VolunteerTask[] = [
+        {
+          id: `TASK-MIT-WATER-${nowId}`,
+          campId: targetCampId,
+          campName: targetCampName,
+          volunteerId: designatedVolunteer.id,
+          volunteerName: designatedVolunteer.name,
+          title: `Verify Water Tanker ${nearestTanker?.id ?? "T-01"} arrival & refill (${nearestTanker?.capacityLiters.toLocaleString()}L)`,
+          type: "WATER_TANKER",
+          etaMinutes: 12,
+          status: "ASSIGNED",
+          createdAt: timeString,
+          updatedAt: timeString,
+        },
+        {
+          id: `TASK-MIT-FOOD-${nowId}`,
+          campId: targetCampId,
+          campName: targetCampName,
+          volunteerId: designatedVolunteer.id,
+          volunteerName: designatedVolunteer.name,
+          title: `Verify Anna Dan Prasad truck delivery (${nearestFood?.name ?? "Mobile Kitchen"})`,
+          type: "FOOD_SUPPLY",
+          etaMinutes: 15,
+          status: "ASSIGNED",
+          createdAt: timeString,
+          updatedAt: timeString,
+        },
+        {
+          id: `TASK-MIT-SAN-${nowId}`,
+          campId: targetCampId,
+          campName: targetCampName,
+          volunteerId: designatedVolunteer.id,
+          volunteerName: designatedVolunteer.name,
+          title: `Verify Mobile Bio-Toilet squad deployment (${nearestSanitation?.name ?? "Sanitation Squad"})`,
+          type: "SANITATION",
+          etaMinutes: 10,
+          status: "ASSIGNED",
+          createdAt: timeString,
+          updatedAt: timeString,
+        },
+      ];
+
+      const updatedTasks = [...newTasks, ...prev.volunteerTasks];
+      const updatedCamps = computeLiveCamps(updatedDindis, LIVE_SUPPORT_CAMPS, updatedTasks);
+
+      const newAlert: Alert = {
+        id: `ALT-MITIGATION-${nowId}`,
+        title: `⚡ Multi-Resource Mitigation Active — ${targetCampName}`,
+        location: targetCampName,
+        severity: "CRITICAL",
+        cause: `Automated triage applied for crowd overload (${targetCamp.currentOccupancy.toLocaleString()} devotees). Water tanker, Food kitchen, and Sanitation squad dispatched.`,
+        forecastText: `Mitigation in progress. On-ground verification assigned to ${designatedVolunteer.name}. Problem will be marked verified once approved in Volunteer Portal.`,
+        recommendedAction: `Dispatched Tanker ${nearestTanker?.id}, Food Kitchen ${nearestFood?.name}, Sanitation ${nearestSanitation?.name}. Rerouted ${largestDindi?.name ?? "Dindi"} to ${backupCamp?.name}.`,
+        timestamp: timeString,
+        status: "ACTIVE",
+        timeToCriticalMinutes: 12,
+        priorityScore: 92,
+        scoreBreakdown: { density: 35, urgency: 25, population: 20, resource: 12 },
+      };
+
+      return {
+        ...prev,
+        isMitigated: true,
+        tankers: prev.tankers.map((t) =>
+          t.id === nearestTanker?.id
+            ? { ...t, status: "EN_ROUTE" as const, assignedCampId: targetCampName, etaMinutes: 12 }
+            : t
+        ),
+        foodSupplies: prev.foodSupplies?.map((f) =>
+          f.id === nearestFood?.id
+            ? { ...f, status: "EN_ROUTE" as const, assignedCampId: targetCampName, etaMinutes: 15 }
+            : f
+        ),
+        sanitationCrews: prev.sanitationCrews.map((s) =>
+          s.id === nearestSanitation?.id
+            ? { ...s, status: "EN_ROUTE" as const, assignedCampId: targetCampName, etaMinutes: 10 }
+            : s
+        ),
+        volunteers: prev.volunteers.map((v) =>
+          v.id === designatedVolunteer.id
+            ? { ...v, status: "DEPLOYED" as const, currentTask: `Coordinate multi-resource arrival at ${targetCampName}` }
+            : v
+        ),
+        dindis: updatedDindis,
+        camps: updatedCamps,
+        volunteerTasks: updatedTasks,
+        alerts: [newAlert, ...prev.alerts],
+        events: [
+          {
+            id: `EV-MIT-${nowId}`,
+            timestamp: timeString,
+            eventType: "COPILOT_REC" as const,
+            severity: "INFO" as const,
+            source: "AI Operations Copilot",
+            description: `Applied full mitigation for ${targetCampName}: Dispatched Tanker ${nearestTanker?.id}, Food Truck ${nearestFood?.id}, Sanitation Squad ${nearestSanitation?.id}, and rerouted overflow Dindi.`,
+          },
+          ...prev.events,
+        ],
+      };
+    });
+  }, []);
+
   const reportVolunteerIncident = useCallback(
     (params: { label: string; severity: "HIGH" | "CRITICAL" | "MEDIUM"; lat?: number; lng?: number }) => {
       const now = Date.now();
@@ -811,54 +1058,122 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
           ? `Volunteer GPS ${params.lat.toFixed(5)}, ${params.lng.toFixed(5)}`
           : "Volunteer GPS unavailable";
 
-      const actionByLabel =
-        params.label === "Medical Emergency"
-          ? "Dispatch nearest medical volunteer and ambulance; keep crowd-control volunteer at approach lane."
-          : params.label === "Water Shortage"
-            ? "Dispatch nearest water tanker and notify Dindi leaders about the refill point."
-            : params.label === "Crowd Surge"
-              ? "Deploy nearby crowd-control volunteers and divert incoming Dindis to the nearest verified halt."
-              : params.label === "Road Blocked"
-                ? "Assign traffic volunteers, mark blockage on map, and route Dindis through the nearest bypass."
-                : params.label === "Sanitation Full"
-                  ? "Dispatch sanitation crew and shift queue to the nearest available facility."
-                  : "Send nearest volunteer team and open a command-centre follow-up task.";
+      setState((prev) => {
+        // Find nearest camp to volunteer
+        const nearestCamp = prev.camps
+          .map((c) => ({
+            camp: c,
+            dist: getDistanceKm(params.lat ?? 18.5138, params.lng ?? 73.8589, c.lat, c.lng),
+          }))
+          .sort((a, b) => a.dist - b.dist)[0]?.camp ?? prev.camps[0];
 
-      const newAlert: Alert = {
-        id: `ALT-VOL-${now}`,
-        title: `Volunteer Report: ${params.label}`,
-        location,
-        severity: params.severity,
-        cause: `${params.label} reported by an on-duty volunteer from the field app.`,
-        forecastText: "Live field report requires command-centre triage and nearest-resource assignment.",
-        recommendedAction: actionByLabel,
-        timestamp: timeString,
-        status: "ACTIVE",
-        timeToCriticalMinutes: params.severity === "CRITICAL" ? 5 : params.severity === "HIGH" ? 15 : 30,
-        priorityScore: params.severity === "CRITICAL" ? 88 : params.severity === "HIGH" ? 68 : 42,
-        scoreBreakdown: {
-          density: params.label === "Crowd Surge" ? 30 : 10,
-          urgency: params.severity === "CRITICAL" ? 35 : 22,
-          population: params.label === "Crowd Surge" ? 18 : 8,
-          resource: params.label === "Water Shortage" || params.label === "Sanitation Full" ? 18 : 12,
-        },
-      };
+        const nearestCampName = nearestCamp?.name ?? "Corridor Camp";
 
-      setState((prev) => ({
-        ...prev,
-        alerts: [newAlert, ...prev.alerts],
-        events: [
-          {
-            id: `EV-VOL-${now}`,
-            timestamp: timeString,
-            eventType: "ALERT" as const,
-            severity: params.severity === "CRITICAL" ? "CRITICAL" : params.severity === "HIGH" ? "WARNING" : "INFO",
-            source: "Volunteer Field Report",
-            description: `${params.label} reported at ${location}`,
-          },
-          ...prev.events,
-        ],
-      }));
+        // Find nearest available volunteer
+        const assignedVolunteer =
+          prev.volunteers.find((v) => v.assignedCampId === nearestCamp.id) ??
+          prev.volunteers[0];
+
+        const isWater = params.label.includes("Water");
+        const isFood = params.label.includes("Food") || params.label.includes("Prasad");
+        const isSanitation = params.label.includes("Sanitation") || params.label.includes("Toilet");
+        const isMedical = params.label.includes("Medical");
+
+        // Dispatches
+        const nearestTanker = prev.tankers.find((t) => t.status === "AVAILABLE");
+        const nearestFood = prev.foodSupplies?.find((f) => f.status === "AVAILABLE");
+        const nearestSanitation = prev.sanitationCrews.find((s) => s.status === "AVAILABLE");
+
+        const taskType: VolunteerTask["type"] = isWater
+          ? "WATER_TANKER"
+          : isFood
+          ? "FOOD_SUPPLY"
+          : isSanitation
+          ? "SANITATION"
+          : isMedical
+          ? "MEDICAL"
+          : "HALT";
+
+        const taskTitle = isWater
+          ? `Verify water tanker ${nearestTanker?.id ?? "T-01"} arrival & refill at ${nearestCampName}`
+          : isFood
+          ? `Verify food / prasad kitchen truck delivery at ${nearestCampName}`
+          : isSanitation
+          ? `Verify mobile bio-toilet deployment at ${nearestCampName}`
+          : isMedical
+          ? `Verify medical emergency triage team at ${nearestCampName}`
+          : `Verify incident resolution: ${params.label} at ${nearestCampName}`;
+
+        const newTask: VolunteerTask = {
+          id: `TASK-VOL-${now}`,
+          campId: nearestCamp.id,
+          campName: nearestCampName,
+          volunteerId: assignedVolunteer.id,
+          volunteerName: assignedVolunteer.name,
+          title: taskTitle,
+          type: taskType,
+          etaMinutes: 12,
+          status: "ASSIGNED",
+          createdAt: timeString,
+          updatedAt: timeString,
+        };
+
+        const updatedTasks = [newTask, ...prev.volunteerTasks];
+        const updatedCamps = computeLiveCamps(prev.dindis, LIVE_SUPPORT_CAMPS, updatedTasks);
+
+        const newAlert: Alert = {
+          id: `ALT-VOL-${now}`,
+          title: `Volunteer Report: ${params.label} at ${nearestCampName}`,
+          location: nearestCampName,
+          severity: params.severity,
+          cause: `${params.label} reported by on-duty volunteer from field app.`,
+          forecastText: `Immediate resource reinforcement triggered. Verification task generated for ${assignedVolunteer.name}. ETA 12 min.`,
+          recommendedAction: `Dispatched ${isWater ? "Water Tanker" : isFood ? "Food Kitchen" : isSanitation ? "Sanitation Squad" : "Field Team"}. Awaiting volunteer arrival verification.`,
+          timestamp: timeString,
+          status: "ACTIVE",
+          timeToCriticalMinutes: params.severity === "CRITICAL" ? 5 : 15,
+          priorityScore: params.severity === "CRITICAL" ? 88 : 68,
+          scoreBreakdown: { density: 20, urgency: 35, population: 15, resource: 18 },
+        };
+
+        return {
+          ...prev,
+          tankers: prev.tankers.map((t) =>
+            isWater && t.id === nearestTanker?.id
+              ? { ...t, status: "EN_ROUTE" as const, assignedCampId: nearestCampName, etaMinutes: 12 }
+              : t
+          ),
+          foodSupplies: prev.foodSupplies?.map((f) =>
+            isFood && f.id === nearestFood?.id
+              ? { ...f, status: "EN_ROUTE" as const, assignedCampId: nearestCampName, etaMinutes: 15 }
+              : f
+          ),
+          sanitationCrews: prev.sanitationCrews.map((s) =>
+            isSanitation && s.id === nearestSanitation?.id
+              ? { ...s, status: "EN_ROUTE" as const, assignedCampId: nearestCampName, etaMinutes: 10 }
+              : s
+          ),
+          volunteers: prev.volunteers.map((v) =>
+            v.id === assignedVolunteer.id
+              ? { ...v, status: "DEPLOYED" as const, currentTask: taskTitle }
+              : v
+          ),
+          camps: updatedCamps,
+          volunteerTasks: updatedTasks,
+          alerts: [newAlert, ...prev.alerts],
+          events: [
+            {
+              id: `EV-VOL-${now}`,
+              timestamp: timeString,
+              eventType: "ALERT" as const,
+              severity: params.severity === "CRITICAL" ? "CRITICAL" : "WARNING",
+              source: "Volunteer Field Report",
+              description: `${params.label} reported at ${nearestCampName}. Resource auto-dispatched & task assigned.`,
+            },
+            ...prev.events,
+          ],
+        };
+      });
     },
     []
   );
@@ -878,7 +1193,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         ...prev,
         dindis: remaining,
         totalPilgrims: remaining.reduce((sum, d) => sum + d.pilgrimCount, 0),
-        camps: !prev.isSimulating ? computeLiveCamps(remaining, LIVE_SUPPORT_CAMPS) : prev.camps,
+        camps: !prev.isSimulating ? computeLiveCamps(remaining, LIVE_SUPPORT_CAMPS, prev.volunteerTasks) : prev.camps,
         events: [
           {
             id: `EV-DEL-${Date.now()}`,
@@ -923,6 +1238,8 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         assignVolunteerToCamp,
         deleteVolunteerTask,
         deleteDindi,
+        applyLiveClusterMitigation,
+        rerouteLiveDindi,
       }}
     >
       {children}

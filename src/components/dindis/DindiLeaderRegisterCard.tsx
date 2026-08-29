@@ -338,11 +338,21 @@ export default function DindiLeaderRegisterCard() {
           </div>
         )}
 
-        <div className="text-xs text-stone-500 text-center">
-          Dindi #{result.dindiNumber} is now visible on the{" "}
-          <a href="/" className="text-orange-600 underline">Tactical Map</a>{" "}
-          and the{" "}
-          <a href="/dindis" className="text-orange-600 underline">Dindi Board</a>
+        <div className="pt-3 border-t border-green-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <button
+            onClick={() => {
+              setStage("IDLE");
+              setForm({ leader: "", mandal: "", count: "100", route: "Sant Dnyaneshwar Maharaj" });
+            }}
+            className="w-full sm:w-auto px-4 py-2 bg-white border border-stone-300 hover:bg-stone-50 text-stone-700 font-bold rounded-xl shadow-sm transition-all active:scale-95"
+          >
+            ➕ Register Another Dindi
+          </button>
+          <span className="text-stone-500 text-center text-[11px]">
+            Dindi #{result.dindiNumber} is active on the{" "}
+            <a href="/" className="text-orange-600 underline font-semibold">Tactical Map</a>{" "}
+            &amp; <a href="/resources" className="text-orange-600 underline font-semibold">Resources Grid</a>.
+          </span>
         </div>
       </div>
     );

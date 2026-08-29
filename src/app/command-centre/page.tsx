@@ -38,6 +38,9 @@ import { VolunteerTask } from "@/lib/types";
 const copy = {
   en: {
     title: "|| Pandhari's Path, Vitthal's Meeting Path ||",
+    subtitle: "Live Real Mode · Central Command & Authority Oversight · Zero Fake Data",
+    deleteReset: "Delete & Reset Live Data",
+    liveOps: "Live Operations",
     map: "Live Tactical Route Map",
     quick: "Direct Command Dispatches",
     timeline: "Wari Operation Timeline",
@@ -45,26 +48,209 @@ const copy = {
     copilot: "WariOS AI Copilot (Voice & RAG)",
     fullMap: "View Full Tactical Map",
     ask: "Ask Copilot in English, Hindi, or Marathi...",
+    routeDesc: "Pune (Alandi) → Pandharpur (240 km) · Real OpenStreetMap corridor waypoints, camps & registered Dindis",
+    volunteerMatrixTitle: "Camps 1–6 Ground Volunteer & Resource Dispatch Matrix",
+    volunteerMatrixSubtitle: "Assign tasks (e.g. water tanker, medical triage, crowd control) to specific camp volunteers. Status and remarks sync automatically.",
+    verifiedCampsBadge: "6 VERIFIED CAMPS",
+    assignedVolunteer: "Assigned Ground Volunteer:",
+    pendingVerification: "Pending Verification",
+    noPendingTasks: "✓ No pending tasks at",
+    dispatchTaskBtn: "Dispatch Task to Camp",
+    volunteer: "Volunteer",
+    capacity: "Capacity",
+    water: "Water",
+    searchDindi: "🔍 Search Dindi / Code",
+    searchPlaceholder: "e.g. DND-1234, Sopan Maharaj, Mandal...",
+    selectDindi: "Select Dindi for Live Context",
+    noDindiOption: "No live Dindis registered yet",
+    awaitingDindi: "Awaiting live Dindi registration",
+    registerDindiPrompt: "Register from /dindi to broadcast GPS.",
+    closestCamp: "Closest Camp (1-6)",
+    nearestHospital: "Nearest Hospital",
+    waterLogistics: "Water Logistics",
+    campVolunteer: "Camp Volunteer",
+    kmAway: "km away",
+    volunteerFeedTitle: "Volunteer Live Task Sync",
+    totalBadge: "TOTAL",
+    remarksLabel: "Volunteer Remarks:",
+    dismiss: "Dismiss",
+    noTasksRunning: "No dispatch tasks currently running. Click 'Dispatch Task to Camp Volunteer' above to stage a tanker or triage team.",
+    copilotDesc: "Ask about Ringan dates, 2026 Palkhi halts, overcrowding, or nearest facilities in Marathi, Hindi, or English.",
+    openFull: "Open Full →",
+    stopVoice: "Stop Voice",
+    replayVoice: "Replay Voice",
+    voiceInputLabel: "Voice input:",
+    queryBtn: "Query",
+    chips: ["2026 Ringan Schedule?", "Nearest Camp & Tanker?", "Live Dindi Status?"],
+    dispatchModalTitle: "Dispatch Task to",
+    dispatchModalDesc: "This task will appear instantly on the assigned volunteer dashboard for verification.",
+    taskTypeLabel: "Task / Resource Type",
+    taskTitleLabel: "Task Title / Details",
+    etaLabel: "Estimated Arrival (ETA Minutes)",
+    assignedContactLabel: "Assigned Ground Contact",
+    notesLabel: "Special Instructions / Dispatch Notes",
+    notesPlaceholder: "e.g. Tanker T-03 driver Sanjay Shinde (982214401). Verify water discharge level and report back.",
+    cancel: "Cancel",
+    dispatchSubmit: "🚀 Dispatch to Volunteer",
+    metricPilgrims: "Total Warkaris",
+    metricWater: "Water Stock",
+    metricVolunteers: "Live Volunteers",
+    metricTasks: "Active Tasks",
+    metricAlerts: "Active Alerts",
+    metricMedical: "Medical Capacity",
+    liveDindisBadge: "Live Dindis",
+    liveGpsReady: "Live GPS Ready",
+    campsSupplied: "Camps 1–6 Supplied",
+    campsStaffed: "6 Camps Staffed",
+    verifiedBadge: "Verified",
+    criticalBadge: "CRITICAL",
+    normalFlow: "Normal Flow",
+    traumaReady: "Trauma Hubs Ready",
+    available: "AVAILABLE",
   },
   hi: {
     title: "|| पंढरी की राह, विठ्ठल से मिलने की राह ||",
-    map: "लाइव वारी मार्ग मानचित्र",
-    quick: "कमांड त्वरित प्रेषण",
+    subtitle: "लाइव कार्यप्रणाली · केंद्रीय कमान व प्रशासनिक निगरानी · वास्तविक डेटा",
+    deleteReset: "लाइव डेटा रीसेट करें",
+    liveOps: "लाइव संचालन",
+    map: "लाइव पालखी मार्ग मानचित्र",
+    quick: "प्रत्यक्ष कमान प्रेषण",
     timeline: "वारी संचालन टाइमलाइन",
-    alerts: "महत्वपूर्ण सूचनाएं",
+    alerts: "महत्वपूर्ण सूचनाएं एवं अलर्ट",
     copilot: "WariOS AI सहायक (ध्वनि और RAG)",
     fullMap: "पूरा मानचित्र देखें",
     ask: "हिंदी, मराठी या अंग्रेजी में पूछें...",
+    routeDesc: "पुणे (आळंदी) → पंढरपुर (240 किमी) · वास्तविक ओपनस्ट्रीटमैप मार्ग, शिविर और पंजीकृत दिंडियां",
+    volunteerMatrixTitle: "शिविर 1 से 6 स्वयंसेवक एवं संसाधन प्रेषण मैट्रिक्स",
+    volunteerMatrixSubtitle: "पानी का टैंकर, चिकित्सा दल, भीड़ नियंत्रण कार्य विशिष्ट शिविर स्वयंसेवकों को सौंपें। स्थिति स्वचालित रूप से सिंक होती है।",
+    verifiedCampsBadge: "6 सत्यापित शिविर",
+    assignedVolunteer: "तैनात शिविर स्वयंसेवक:",
+    pendingVerification: "सत्यापन लंबित",
+    noPendingTasks: "✓ कोई लंबित कार्य नहीं -",
+    dispatchTaskBtn: "कार्य सौंपें - शिविर",
+    volunteer: "स्वयंसेवक",
+    capacity: "क्षमता",
+    water: "पानी",
+    searchDindi: "🔍 दिंडी / कोड खोजें",
+    searchPlaceholder: "उदा. DND-1234, सोपान महाराज, मंडल...",
+    selectDindi: "लाइव संदर्भ हेतु दिंडी चुनें",
+    noDindiOption: "अभी तक कोई दिंडी पंजीकृत नहीं",
+    awaitingDindi: "लाइव दिंडी पंजीकरण की प्रतीक्षा",
+    registerDindiPrompt: "GPS प्रसारित करने के लिए /dindi पर पंजीकरण करें।",
+    closestCamp: "निकटतम शिविर (1-6)",
+    nearestHospital: "निकटतम अस्पताल",
+    waterLogistics: "जल आपूर्ति",
+    campVolunteer: "शिविर स्वयंसेवक",
+    kmAway: "किमी दूर",
+    volunteerFeedTitle: "स्वयंसेवक लाइव कार्य सिंक",
+    totalBadge: "कुल",
+    remarksLabel: "स्वयंसेवक टिप्पणी:",
+    dismiss: "हटाएं",
+    noTasksRunning: "वर्तमान में कोई कार्य नहीं चल रहा। टैंकर या राहत दल तैनात करने के लिए ऊपर 'कार्य सौंपें' पर क्लिक करें।",
+    copilotDesc: "रिंगण तिथियां, 2026 पालखी पड़ाव, भीड़ या नजदीकी सुविधाओं के बारे में हिंदी, मराठी या अंग्रेजी में पूछें।",
+    openFull: "पूरा खोलें →",
+    stopVoice: "आवाज रोकें",
+    replayVoice: "आवाज दोबारा सुनें",
+    voiceInputLabel: "आवाज इनपुट:",
+    queryBtn: "पूछें",
+    chips: ["2026 रिंगण शेड्यूल?", "निकटतम शिविर व टैंकर?", "लाइव दिंडी स्थिति?"],
+    dispatchModalTitle: "कार्य सौंपें -",
+    dispatchModalDesc: "यह कार्य सत्यापन हेतु तैनात स्वयंसेवक के डैशबोर्ड पर तुरंत दिखाई देगा।",
+    taskTypeLabel: "कार्य / संसाधन प्रकार",
+    taskTitleLabel: "कार्य शीर्षक / विवरण",
+    etaLabel: "पहुंचने का अनुमानित समय (मिनट)",
+    assignedContactLabel: "तैनात शिविर संपर्क",
+    notesLabel: "विशेष निर्देश / प्रेषण नोट",
+    notesPlaceholder: "उदा. टैंकर T-03 चालक संजय शिंदे (982214401)। पानी का स्तर जांचें और रिपोर्ट करें।",
+    cancel: "रद्द करें",
+    dispatchSubmit: "🚀 स्वयंसेवक को भेजें",
+    metricPilgrims: "कुल वारकरी",
+    metricWater: "जल भंडार",
+    metricVolunteers: "सक्रिय स्वयंसेवक",
+    metricTasks: "सक्रिय कार्य",
+    metricAlerts: "सक्रिय अलर्ट",
+    metricMedical: "चिकित्सा क्षमता",
+    liveDindisBadge: "लाइव दिंडी",
+    liveGpsReady: "लाइव GPS सक्रिय",
+    campsSupplied: "शिविर 1 से 6 जल आपूर्ति",
+    campsStaffed: "6 शिविरों में स्वयंसेवक",
+    verifiedBadge: "सत्यापित",
+    criticalBadge: "गंभीर",
+    normalFlow: "सामान्य प्रवाह",
+    traumaReady: "आईसीयू तैयार",
+    available: "उपलब्ध",
   },
   mr: {
     title: "|| पंढरीची वाट, विठ्ठलाच्या भेटीची वाट ||",
-    map: "लाइव्ह वारी मार्ग नकाशा",
-    quick: "थेट कमांड कृती",
-    timeline: "वारी ऑपरेशन टाइमलाइन",
-    alerts: "महत्त्वाच्या सूचना व अलर्ट",
+    subtitle: "थेट कार्यप्रणाली · मध्यवर्ती नियंत्रण कक्ष व प्रशासकीय देखरेख · प्रत्यक्ष डेटा",
+    deleteReset: "थेट डेटा रीसेट करा",
+    liveOps: "थेट कार्यचालन",
+    map: "थेट पालखी मार्ग नकाशा",
+    quick: "थेट कमांड प्रेषण",
+    timeline: "वारी कार्यचालन टाइमलाइन",
+    alerts: "महत्त्वाच्या सूचना व इशारे",
     copilot: "WariOS AI सहाय्यक (आवाज व RAG)",
-    fullMap: "पूर्ण नकाशा पहा",
-    ask: "मराठी, हिंदी किंवा इंग्रजीत प्रश्न विचारा...",
+    fullMap: "पूर्ण नकाशा पाहा",
+    ask: "मराठी, हिंदी किंवा इंग्रजीत विचारा...",
+    routeDesc: "पुणे (आळंदी) → पंढरपूर (२४० किमी) · थेट ओपनस्ट्रीटनकाशा मार्ग, तळ आणि नोंदणीकृत दिंड्या",
+    volunteerMatrixTitle: "तळ १ ते ६ स्वयंसेवक आणि संसाधन नियुक्ती मॅट्रिक्स",
+    volunteerMatrixSubtitle: "पाण्याचा टँकर, वैद्यकीय पथक, गर्दी नियंत्रण कार्ये विशिष्ट तळ स्वयंसेवकांना नियुक्त करा. स्थिती स्वयंचलितपणे सिंक होते.",
+    verifiedCampsBadge: "६ अधिकृत तळ",
+    assignedVolunteer: "नियुक्त तळ स्वयंसेवक:",
+    pendingVerification: "सत्यापन प्रलंबित",
+    noPendingTasks: "✓ कोणतीही प्रलंबित कार्ये नाहीत -",
+    dispatchTaskBtn: "कार्य नियुक्त करा - तळ",
+    volunteer: "स्वयंसेवक",
+    capacity: "क्षमता",
+    water: "पाणी",
+    searchDindi: "🔍 दिंडी / कोड शोधा",
+    searchPlaceholder: "उदा. DND-1234, सोपान महाराज, मंडळ...",
+    selectDindi: "थेट माहितीसाठी दिंडी निवडा",
+    noDindiOption: "अद्याप कोणतीही दिंडी नोंदणीकृत नाही",
+    awaitingDindi: "थेट दिंडी नोंदणीची प्रतीक्षा",
+    registerDindiPrompt: "GPS प्रसारीत करण्यासाठी /dindi वर नोंदणी करा.",
+    closestCamp: "जवळचा तळ (१-६)",
+    nearestHospital: "जवळचे रुग्णालय",
+    waterLogistics: "पाणी पुरवठा",
+    campVolunteer: "तळ स्वयंसेवक",
+    kmAway: "किमी अंतरावर",
+    volunteerFeedTitle: "स्वयंसेवक थेट कार्य सिंक",
+    totalBadge: "एकूण",
+    remarksLabel: "स्वयंसेवक शेरा:",
+    dismiss: "बंद करा",
+    noTasksRunning: "सध्या कोणतीही प्रेषण कार्ये चालू नाहीत. टँकर किंवा मदत पथक पाठवण्यासाठी वरील 'कार्य नियुक्त करा' बटणावर क्लिक करा.",
+    copilotDesc: "रिंगण तारखा, २०२६ पालखी मुक्काम, गर्दी किंवा जवळच्या सुविधांबद्दल मराठी, हिंदी किंवा इंग्रजीत विचारा.",
+    openFull: "पूर्ण उघडा →",
+    stopVoice: "आवाज थांबवा",
+    replayVoice: "आवाज पुन्हा ऐका",
+    voiceInputLabel: "आवाज इनपुट:",
+    queryBtn: "विचारा",
+    chips: ["२०२६ रिंगण वेळापत्रक?", "जवळचा तळ व टँकर?", "थेट दिंडी स्थिती?"],
+    dispatchModalTitle: "कार्य नियुक्त करा -",
+    dispatchModalDesc: "हे कार्य पडताळणीसाठी नियुक्त केलेल्या स्वयंसेवकाच्या डॅशबोर्डवर तत्काळ दिसेल.",
+    taskTypeLabel: "कार्य / संसाधन प्रकार",
+    taskTitleLabel: "कार्याचे शीर्षक / तपशील",
+    etaLabel: "अंदाजे पोहोचण्याची वेळ (मिनिटे)",
+    assignedContactLabel: "नियुक्त तळ संपर्क",
+    notesLabel: "विशेष सूचना / प्रेषण टीप",
+    notesPlaceholder: "उदा. टँकर T-03 चालक संजय शिंदे (982214401). पाणी साठा तपासा आणि कळवा.",
+    cancel: "रद्द करा",
+    dispatchSubmit: "🚀 स्वयंसेवकाकडे पाठवा",
+    metricPilgrims: "एकूण वारकरी",
+    metricWater: "पाणी साठा",
+    metricVolunteers: "सक्रिय स्वयंसेवक",
+    metricTasks: "सक्रिय कार्ये",
+    metricAlerts: "सक्रिय इशारे",
+    metricMedical: "वैद्यकीय क्षमता",
+    liveDindisBadge: "थेट दिंड्या",
+    liveGpsReady: "थेट GPS सज्ज",
+    campsSupplied: "तळ १ ते ६ पाणीपुरवठा",
+    campsStaffed: "६ तळांवर स्वयंसेवक सज्ज",
+    verifiedBadge: "सत्यापित",
+    criticalBadge: "गंभीर",
+    normalFlow: "सुरळीत प्रवाह",
+    traumaReady: "आयसीयू सज्ज",
+    available: "उपलब्ध",
   },
 };
 
@@ -256,44 +442,44 @@ export default function CommandCentre() {
 
   const metricCards = [
     {
-      label: language === "en" ? "Total Warkaris" : language === "hi" ? "कुल वारकरी" : "एकूण वारकरी",
+      label: c.metricPilgrims,
       value: `${Math.max(state.totalPilgrims, topCluster?.totalPilgrims ?? 0).toLocaleString()}`,
-      delta: liveDindis.length > 0 ? `${liveDindis.length} Live Dindis` : "Live GPS Ready",
+      delta: liveDindis.length > 0 ? `${liveDindis.length} ${c.liveDindisBadge}` : c.liveGpsReady,
       icon: Users,
       tone: "text-orange-700",
     },
     {
-      label: language === "en" ? "Water Stock" : language === "hi" ? "जल स्टॉक" : "पाणी साठा",
-      value: `${availableTankers} Tankers`,
-      delta: "Camps 1–6 Supplied",
+      label: c.metricWater,
+      value: `${availableTankers} ${language === "mr" ? "टँकर" : language === "hi" ? "टैंकर" : "Tankers"}`,
+      delta: c.campsSupplied,
       icon: Droplets,
       tone: "text-blue-600",
     },
     {
-      label: language === "en" ? "Live Volunteers" : language === "hi" ? "सक्रिय स्वयंसेवक" : "सक्रिय स्वयंसेवक",
+      label: c.metricVolunteers,
       value: `${state.volunteers.length}`,
-      delta: "6 Camps Staffed",
+      delta: c.campsStaffed,
       icon: Users,
       tone: "text-purple-700",
     },
     {
-      label: language === "en" ? "Active Tasks" : language === "hi" ? "सक्रिय कार्य" : "सक्रिय कार्य",
+      label: c.metricTasks,
       value: `${state.volunteerTasks.filter((t) => t.status !== "VERIFIED").length}`,
-      delta: `${state.volunteerTasks.filter((t) => t.status === "VERIFIED").length} Verified`,
+      delta: `${state.volunteerTasks.filter((t) => t.status === "VERIFIED").length} ${c.verifiedBadge}`,
       icon: CheckCircle2,
       tone: "text-emerald-700",
     },
     {
-      label: language === "en" ? "Active Alerts" : language === "hi" ? "अलर्ट" : "अलर्ट",
+      label: c.metricAlerts,
       value: `${activeAlerts.length}`,
-      delta: criticalAlerts.length > 0 ? `${criticalAlerts.length} CRITICAL` : "Normal Flow",
+      delta: criticalAlerts.length > 0 ? `${criticalAlerts.length} ${c.criticalBadge}` : c.normalFlow,
       icon: AlertTriangle,
       tone: criticalAlerts.length > 0 ? "text-red-600" : "text-amber-600",
     },
     {
-      label: language === "en" ? "Medical Capacity" : language === "hi" ? "चिकित्सा क्षमता" : "वैद्यकीय क्षमता",
+      label: c.metricMedical,
       value: `${medicalCapacity}%`,
-      delta: "Trauma Hubs Ready",
+      delta: c.traumaReady,
       icon: HospitalIcon,
       tone: "text-red-700",
     },
@@ -312,28 +498,28 @@ export default function CommandCentre() {
                 <h1 className="text-2xl sm:text-3xl font-black text-[#5b2b17] tracking-tight">{c.title}</h1>
               </div>
               <p className="text-xs text-[#7a4b32] mt-1 font-semibold">
-                {state.isSimulating ? "🧪 Demo Archive" : "🟢 Live Real Mode"} · Central Command & Authority Oversight · Zero Fake Data
+                {state.isSimulating ? "🧪 Demo Archive" : "🟢 Live Real Mode"} · {c.subtitle}
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-sm">
               <button
                 onClick={() => {
-                  if (confirm("Are you sure you want to delete current live data and reset to fresh state?")) {
+                  if (confirm(language === "mr" ? "तुम्हाला नक्की सर्व थेट डेटा रीसेट करायचा आहे का?" : language === "hi" ? "क्या आप वाकई लाइव डेटा रीसेट करना चाहते हैं?" : "Are you sure you want to delete current live data and reset to fresh state?")) {
                     resetAll();
                   }
                 }}
                 className="rounded-2xl border border-red-300 bg-red-50 hover:bg-red-100 text-red-800 font-bold px-3 py-2 text-xs flex items-center gap-1.5 shadow-sm transition-all"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                Delete & Reset Live Data
+                {c.deleteReset}
               </button>
 
               <div className="rounded-2xl bg-white/85 border border-orange-100 px-4 py-2 flex items-center gap-2 shadow-sm">
                 <Clock className="w-4 h-4 text-wari-textPrimary" />
                 <div>
                   <div className="font-black text-sm">{state.currentClock}</div>
-                  <div className="text-[10px] text-wari-textMuted">Live Operations</div>
+                  <div className="text-[10px] text-wari-textMuted">{c.liveOps}</div>
                 </div>
               </div>
             </div>
@@ -364,14 +550,14 @@ export default function CommandCentre() {
           <div>
             <h2 className="text-lg font-black text-wari-textPrimary flex items-center gap-2">
               <Building2 className="w-5 h-5 text-orange-600" />
-              Camps 1–6 Ground Volunteer & Resource Dispatch Matrix
+              {c.volunteerMatrixTitle}
             </h2>
             <p className="text-xs text-wari-textMuted">
-              Assign tasks (e.g. water tanker, medical triage, crowd control) to specific camp volunteers. Status and remarks sync automatically.
+              {c.volunteerMatrixSubtitle}
             </p>
           </div>
           <span className="text-xs font-mono font-bold bg-orange-100 text-orange-800 px-3 py-1 rounded-full self-start sm:self-auto">
-            6 VERIFIED CAMPS
+            {c.verifiedCampsBadge}
           </span>
         </div>
 
@@ -392,36 +578,36 @@ export default function CommandCentre() {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-orange-600 text-white">
-                      Camp {idx + 1}
+                      {language === "mr" ? `तळ ${idx + 1}` : language === "hi" ? `शिविर ${idx + 1}` : `Camp ${idx + 1}`}
                     </span>
                     <h3 className="font-bold text-wari-textPrimary text-sm mt-1">{camp.name}</h3>
                     <div className="text-[11px] text-wari-textMuted">
-                      Capacity: {camp.capacity.toLocaleString()} • Water: {camp.waterStockPercent}%
+                      {c.capacity}: {camp.capacity.toLocaleString()} • {c.water}: {camp.waterStockPercent}%
                     </div>
                   </div>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                     camp.status === "CRITICAL" ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800"
                   }`}>
-                    {camp.status}
+                    {camp.status === "CRITICAL" ? (language === "mr" ? "गंभीर" : language === "hi" ? "गंभीर" : "CRITICAL") : (language === "mr" ? "सामान्य" : language === "hi" ? "सामान्य" : "NORMAL")}
                   </span>
                 </div>
 
                 {/* Assigned Volunteer */}
                 <div className="p-2.5 rounded-xl bg-white border border-orange-100 flex items-center justify-between text-xs">
                   <div className="space-y-0.5">
-                    <span className="text-[10px] text-wari-textMuted block">Assigned Ground Volunteer:</span>
+                    <span className="text-[10px] text-wari-textMuted block">{c.assignedVolunteer}</span>
                     <strong className="text-purple-950 font-bold">{assignedVol?.name ?? "Designated Volunteer"}</strong>
                     <div className="text-[10px] text-purple-700 font-mono">{assignedVol?.phone || "+91 90000 10001"}</div>
                   </div>
                   <span className="text-[10px] px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold">
-                    {assignedVol?.status ?? "AVAILABLE"}
+                    {assignedVol?.status === "AVAILABLE" ? c.available : assignedVol?.status ?? "AVAILABLE"}
                   </span>
                 </div>
 
                 {/* Active Tasks on this camp */}
                 {pendingTasks.length > 0 ? (
                   <div className="space-y-1.5">
-                    <span className="text-[10px] font-bold text-orange-900 block">Pending Verification ({pendingTasks.length}):</span>
+                    <span className="text-[10px] font-bold text-orange-900 block">{c.pendingVerification} ({pendingTasks.length}):</span>
                     {pendingTasks.map((t) => (
                       <div key={t.id} className="p-2 bg-white/90 rounded-lg border border-orange-200 text-[11px] flex items-center justify-between gap-2">
                         <span className="truncate font-semibold text-wari-textPrimary">{t.title}</span>
@@ -432,7 +618,7 @@ export default function CommandCentre() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-[11px] text-emerald-700 font-medium">✓ No pending tasks at Camp {idx + 1}</div>
+                  <div className="text-[11px] text-emerald-700 font-medium">{c.noPendingTasks} {language === "mr" ? `तळ ${idx + 1}` : language === "hi" ? `शिविर ${idx + 1}` : `Camp ${idx + 1}`}</div>
                 )}
 
                 {/* Dispatch Button */}
@@ -444,7 +630,7 @@ export default function CommandCentre() {
                   className="w-full py-2 bg-orange-600 hover:bg-orange-700 active:scale-98 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all"
                 >
                   <PlusCircle className="w-3.5 h-3.5" />
-                  Dispatch Task to Camp {idx + 1} Volunteer
+                  {c.dispatchTaskBtn} {idx + 1} {c.volunteer}
                 </button>
               </div>
             );
@@ -461,10 +647,10 @@ export default function CommandCentre() {
                 <span className="text-2xl">📦</span>
                 <div>
                   <h3 className="font-bold text-wari-textPrimary text-base">
-                    Dispatch Task to {state.camps.find((c) => c.id === dispatchModalCampId)?.name}
+                    {c.dispatchModalTitle} {state.camps.find((c) => c.id === dispatchModalCampId)?.name}
                   </h3>
                   <p className="text-xs text-wari-textMuted">
-                    This task will appear instantly on the assigned volunteer dashboard for verification.
+                    {c.dispatchModalDesc}
                   </p>
                 </div>
               </div>
@@ -478,7 +664,7 @@ export default function CommandCentre() {
 
             <form onSubmit={handleDispatchSubmit} className="space-y-3.5">
               <div>
-                <label className="text-xs font-bold text-wari-textSecond block mb-1">Task / Resource Type</label>
+                <label className="text-xs font-bold text-wari-textSecond block mb-1">{c.taskTypeLabel}</label>
                 <select
                   value={taskType}
                   onChange={(e) => {
@@ -502,7 +688,7 @@ export default function CommandCentre() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-wari-textSecond block mb-1">Task Title / Details</label>
+                <label className="text-xs font-bold text-wari-textSecond block mb-1">{c.taskTitleLabel}</label>
                 <input
                   type="text"
                   value={taskTitle}
@@ -514,7 +700,7 @@ export default function CommandCentre() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-wari-textSecond block mb-1">Estimated Arrival (ETA Minutes)</label>
+                  <label className="text-xs font-bold text-wari-textSecond block mb-1">{c.etaLabel}</label>
                   <input
                     type="number"
                     min={1}
@@ -525,7 +711,7 @@ export default function CommandCentre() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-wari-textSecond block mb-1">Assigned Ground Contact</label>
+                  <label className="text-xs font-bold text-wari-textSecond block mb-1">{c.assignedContactLabel}</label>
                   <div className="p-2 rounded-xl bg-purple-50 border border-purple-200 text-xs font-bold text-purple-900 truncate">
                     {state.volunteers.find((v) => v.assignedCampId === dispatchModalCampId)?.name || "Camp Volunteer"}
                   </div>
@@ -533,11 +719,11 @@ export default function CommandCentre() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-wari-textSecond block mb-1">Special Instructions / Dispatch Notes</label>
+                <label className="text-xs font-bold text-wari-textSecond block mb-1">{c.notesLabel}</label>
                 <textarea
                   value={taskNotes}
                   onChange={(e) => setTaskNotes(e.target.value)}
-                  placeholder="e.g. Tanker T-03 driver Sanjay Shinde (982214401). Verify water discharge level and report back."
+                  placeholder={c.notesPlaceholder}
                   className="w-full rounded-xl border border-gray-300 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-orange-400 min-h-16"
                 />
               </div>
@@ -548,13 +734,13 @@ export default function CommandCentre() {
                   onClick={() => setDispatchModalCampId(null)}
                   className="flex-1 py-2.5 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-50"
                 >
-                  Cancel
+                  {c.cancel}
                 </button>
                 <button
                   type="submit"
                   className="flex-1 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow transition-all"
                 >
-                  🚀 Dispatch to Volunteer
+                  {c.dispatchSubmit}
                 </button>
               </div>
             </form>
@@ -573,40 +759,40 @@ export default function CommandCentre() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
               <div className="lg:col-span-4">
                 <label className="text-[11px] uppercase font-black text-wari-textMuted tracking-wider">
-                  🔍 Search Dindi / Code
+                  {c.searchDindi}
                 </label>
                 <input
                   value={dindiSearch}
                   onChange={(event) => setDindiSearch(event.target.value)}
-                  placeholder="e.g. DND-1234, Sopan Maharaj, Mandal..."
+                  placeholder={c.searchPlaceholder}
                   className="mt-1 w-full rounded-xl border border-wari-cardBorder bg-white px-3 py-2 text-xs font-medium outline-none focus:border-wari-orange"
                 />
               </div>
               <div className="lg:col-span-4">
                 <label className="text-[11px] uppercase font-black text-wari-textMuted tracking-wider">
-                  Select Dindi for Live Context
+                  {c.selectDindi}
                 </label>
                 <select
                   value={selectedDindi?.id ?? ""}
                   onChange={(event) => setSelectedDindiId(event.target.value)}
                   className="mt-1 w-full rounded-xl border border-wari-cardBorder bg-white px-3 py-2 text-xs font-bold outline-none focus:border-wari-orange"
                 >
-                  {filteredDindis.length === 0 && <option value="">No live Dindis registered yet</option>}
+                  {filteredDindis.length === 0 && <option value="">{c.noDindiOption}</option>}
                   {filteredDindis.map((dindi) => (
                     <option key={dindi.id} value={dindi.id}>
-                      {dindi.name} · {dindi.passcode} · {dindi.pilgrimCount.toLocaleString()} people
+                      {dindi.name} · {dindi.passcode} · {dindi.pilgrimCount.toLocaleString()} {language === "mr" ? "भाविक" : language === "hi" ? "श्रद्धालु" : "people"}
                     </option>
                   ))}
                 </select>
               </div>
               <div className="lg:col-span-4 rounded-2xl bg-orange-50 border border-orange-200 p-2.5 text-xs">
                 <div className="font-bold text-orange-950 truncate">
-                  {selectedDindi ? `${selectedDindi.name} (${selectedDindi.passcode})` : "Awaiting live Dindi registration"}
+                  {selectedDindi ? `${selectedDindi.name} (${selectedDindi.passcode})` : c.awaitingDindi}
                 </div>
                 <div className="text-[11px] text-orange-800 mt-0.5">
                   {selectedDindi
-                    ? `GPS: ${selectedDindi.lat.toFixed(4)}°N, ${selectedDindi.lng.toFixed(4)}°E · ~${selectedDindi.pilgrimCount.toLocaleString()} devotees`
-                    : "Register from /dindi to broadcast GPS."}
+                    ? `GPS: ${selectedDindi.lat.toFixed(4)}°N, ${selectedDindi.lng.toFixed(4)}°E · ~${selectedDindi.pilgrimCount.toLocaleString()} ${language === "mr" ? "भाविक" : language === "hi" ? "श्रद्धालु" : "devotees"}`
+                    : c.registerDindiPrompt}
                 </div>
               </div>
             </div>
@@ -615,24 +801,24 @@ export default function CommandCentre() {
             {selectedFacilities && (
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 pt-2 text-xs">
                 <div className="rounded-xl border border-purple-200 bg-purple-50/60 p-2.5">
-                  <span className="text-[10px] text-purple-700 font-bold block">Closest Camp (1-6)</span>
+                  <span className="text-[10px] text-purple-700 font-bold block">{c.closestCamp}</span>
                   <strong className="text-purple-950 font-bold block truncate">{selectedFacilities.camp?.item.name ?? "Calculating..."}</strong>
-                  <span className="text-purple-700 font-bold text-[11px]">{selectedFacilities.camp?.distanceKm ?? 0} km away</span>
+                  <span className="text-purple-700 font-bold text-[11px]">{selectedFacilities.camp?.distanceKm ?? 0} {c.kmAway}</span>
                 </div>
                 <div className="rounded-xl border border-red-200 bg-red-50/60 p-2.5">
-                  <span className="text-[10px] text-red-700 font-bold block">Nearest Hospital</span>
+                  <span className="text-[10px] text-red-700 font-bold block">{c.nearestHospital}</span>
                   <strong className="text-red-950 font-bold block truncate">{selectedFacilities.medical?.item.name ?? "Deenanath / Sassoon"}</strong>
-                  <span className="text-red-700 font-bold text-[11px]">{selectedFacilities.medical?.distanceKm ?? 0} km away</span>
+                  <span className="text-red-700 font-bold text-[11px]">{selectedFacilities.medical?.distanceKm ?? 0} {c.kmAway}</span>
                 </div>
                 <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-2.5">
-                  <span className="text-[10px] text-blue-700 font-bold block">Water Logistics</span>
+                  <span className="text-[10px] text-blue-700 font-bold block">{c.waterLogistics}</span>
                   <strong className="text-blue-950 font-bold block truncate">{selectedFacilities.tanker?.item.id ?? "T-03 Tanker"}</strong>
-                  <span className="text-blue-700 font-bold text-[11px]">{selectedFacilities.tanker?.distanceKm ?? 0} km away</span>
+                  <span className="text-blue-700 font-bold text-[11px]">{selectedFacilities.tanker?.distanceKm ?? 0} {c.kmAway}</span>
                 </div>
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-2.5">
-                  <span className="text-[10px] text-emerald-700 font-bold block">Camp Volunteer</span>
+                  <span className="text-[10px] text-emerald-700 font-bold block">{c.campVolunteer}</span>
                   <strong className="text-emerald-950 font-bold block truncate">{selectedFacilities.volunteer?.item.name ?? "Aarav Patil"}</strong>
-                  <span className="text-emerald-700 font-bold text-[11px]">{selectedFacilities.volunteer?.distanceKm ?? 0} km away</span>
+                  <span className="text-emerald-700 font-bold text-[11px]">{selectedFacilities.volunteer?.distanceKm ?? 0} {c.kmAway}</span>
                 </div>
               </div>
             )}
@@ -646,7 +832,7 @@ export default function CommandCentre() {
                   {c.map} <span className="badge-live">LIVE</span>
                 </h2>
                 <p className="text-xs text-wari-textMuted">
-                  Pune (Alandi) → Pandharpur (240 km) · Real OpenStreetMap corridor waypoints, camps & registered Dindis
+                  {c.routeDesc}
                 </p>
               </div>
               <Link href="/map" className="btn-secondary flex items-center gap-1.5 text-xs font-bold">
@@ -667,10 +853,10 @@ export default function CommandCentre() {
             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
               <h2 className="text-base font-black text-wari-textPrimary flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                Volunteer Live Task Sync
+                {c.volunteerFeedTitle}
               </h2>
               <span className="text-[10px] font-mono font-bold bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full">
-                {state.volunteerTasks.length} TOTAL
+                {state.volunteerTasks.length} {c.totalBadge}
               </span>
             </div>
 
@@ -708,7 +894,7 @@ export default function CommandCentre() {
 
                   {task.remarks && (
                     <div className="p-1.5 rounded-lg bg-white border border-gray-200 text-[10px] text-gray-800 font-medium">
-                      💬 Volunteer Remarks: {task.remarks}
+                      💬 {c.remarksLabel} {task.remarks}
                     </div>
                   )}
 
@@ -718,7 +904,7 @@ export default function CommandCentre() {
                       onClick={() => deleteVolunteerTask(task.id)}
                       className="text-red-500 hover:text-red-700 font-bold"
                     >
-                      Dismiss
+                      {c.dismiss}
                     </button>
                   </div>
                 </div>
@@ -726,7 +912,7 @@ export default function CommandCentre() {
 
               {state.volunteerTasks.length === 0 && (
                 <div className="text-xs text-wari-textMuted rounded-2xl bg-wari-pageBg border border-wari-cardBorder p-4 text-center">
-                  No dispatch tasks currently running. Click "Dispatch Task to Camp Volunteer" above to stage a tanker or triage team.
+                  {c.noTasksRunning}
                 </div>
               )}
             </div>
@@ -740,12 +926,12 @@ export default function CommandCentre() {
                 <h2 className="text-base font-black text-wari-textPrimary">{c.copilot}</h2>
               </div>
               <Link href="/copilot" className="text-xs text-wari-orange font-bold hover:underline">
-                Open Full →
+                {c.openFull}
               </Link>
             </div>
 
             <p className="text-[11px] text-wari-textMuted">
-              Ask about Ringan dates, 2026 Palkhi halts, overcrowding, or nearest facilities in Marathi, Hindi, or English.
+              {c.copilotDesc}
             </p>
 
             {/* Voice Output Box */}
@@ -758,14 +944,14 @@ export default function CommandCentre() {
                       onClick={stopSpeaking}
                       className="text-[10px] text-red-600 font-bold flex items-center gap-1"
                     >
-                      <Volume2 className="w-3 h-3 animate-pulse" /> Stop Voice
+                      <Volume2 className="w-3 h-3 animate-pulse" /> {c.stopVoice}
                     </button>
                   ) : (
                     <button
                       onClick={() => speak(aiResponse, language)}
                       className="text-[10px] text-orange-700 font-bold flex items-center gap-1 hover:underline"
                     >
-                      <Volume2 className="w-3 h-3" /> Replay Voice
+                      <Volume2 className="w-3 h-3" /> {c.replayVoice}
                     </button>
                   )}
                 </div>
@@ -810,12 +996,12 @@ export default function CommandCentre() {
 
               {transcript && (
                 <div className="text-[10px] text-emerald-800 font-semibold bg-emerald-50 px-2 py-1 rounded-lg flex items-center justify-between">
-                  <span>Voice input: "{transcript}"</span>
+                  <span>{c.voiceInputLabel} "{transcript}"</span>
                   <button
                     onClick={() => handleAskCopilot(transcript)}
                     className="text-orange-700 font-bold hover:underline"
                   >
-                    Query
+                    {c.queryBtn}
                   </button>
                 </div>
               )}
@@ -823,11 +1009,7 @@ export default function CommandCentre() {
 
             {/* Quick Prompt Chips */}
             <div className="flex flex-wrap gap-1.5 pt-1">
-              {[
-                "2026 Ringan Schedule?",
-                "Nearest Camp & Tanker?",
-                "Live Dindi Status?",
-              ].map((chip) => (
+              {c.chips.map((chip) => (
                 <button
                   key={chip}
                   onClick={() => handleAskCopilot(chip)}

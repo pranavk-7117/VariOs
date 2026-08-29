@@ -53,106 +53,106 @@ export const Sidebar: React.FC = () => {
   const navSections = [
     {
       emoji: "🟠",
-      label: "DINDI LEADERS",
+      label: language === "mr" ? "दिंडी प्रमुख" : language === "hi" ? "दिंडी प्रमुख" : "DINDI LEADERS",
       color: "text-orange-600",
       items: [
         {
-          label: "Dindi Registration & GPS",
+          label: language === "mr" ? "दिंडी नोंदणी आणि GPS" : language === "hi" ? "दिंडी पंजीकरण एवं GPS" : "Dindi Registration & GPS",
           href: "/dindi",
           icon: Compass,
           badge: realDindiCount > 0 ? String(realDindiCount) : undefined,
           badgeCls: "bg-orange-100 text-orange-800 border border-orange-200",
-          desc: "Register, track & request help",
+          desc: language === "mr" ? "नोंदणी, ट्रॅकिंग व मदत" : language === "hi" ? "पंजीकरण, ट्रैकिंग व सहायता" : "Register, track & request help",
         },
       ],
     },
     {
       emoji: "👷",
-      label: "VOLUNTEERS",
+      label: language === "mr" ? "स्वयंसेवक" : language === "hi" ? "स्वयंसेवक" : "VOLUNTEERS",
       color: "text-purple-600",
       items: [
         {
-          label: "Volunteer Seva Portal",
+          label: language === "mr" ? "स्वयंसेवक सेवा पोर्टल" : language === "hi" ? "स्वयंसेवक सेवा पोर्टल" : "Volunteer Seva Portal",
           href: "/volunteer",
           icon: HeartHandshake,
-          badge: "SEVA",
+          badge: language === "mr" ? "सेवा" : language === "hi" ? "सेवा" : "SEVA",
           badgeCls: "bg-purple-100 text-purple-800 border border-purple-200",
-          desc: "Report incidents, track tasks",
+          desc: language === "mr" ? "घटना नोंदवा व कार्ये तपासा" : language === "hi" ? "घटना रिपोर्ट व कार्य जांच" : "Report incidents, track tasks",
         },
       ],
     },
     {
       emoji: "🏛️",
-      label: "AUTHORITIES",
+      label: language === "mr" ? "प्रशासन व नियंत्रण" : language === "hi" ? "प्रशासन एवं कमान" : "AUTHORITIES",
       color: "text-slate-600",
       items: [
         {
-          label: "Command Centre",
+          label: language === "mr" ? "कमांड सेंटर" : language === "hi" ? "कमांड सेंटर" : "Command Centre",
           href: "/command-centre",
           icon: LayoutDashboard,
-          desc: "Tactical overview",
+          desc: language === "mr" ? "थेट कार्यचालन आढावा" : language === "hi" ? "सामरिक संचालन अवलोकन" : "Tactical overview",
         },
         {
-          label: "Corridor GIS Map",
+          label: language === "mr" ? "कॉरिडोर नकाशा" : language === "hi" ? "कॉरिडोर मानचित्र" : "Corridor GIS Map",
           href: "/map",
           icon: MapPin,
-          desc: "Live corridor map",
+          desc: language === "mr" ? "थेट वारी मार्ग नकाशा" : language === "hi" ? "लाइव मार्ग मानचित्र" : "Live corridor map",
         },
         {
-          label: "Incidents & Triage",
+          label: language === "mr" ? "घटना आणि निवारण" : language === "hi" ? "घटनाएं एवं समाधान" : "Incidents & Triage",
           href: "/incidents",
           icon: ShieldAlert,
           badge: criticalCount > 0 ? String(criticalCount) : undefined,
           badgeCls: "bg-red-100 text-red-700 border border-red-200 animate-pulse",
-          desc: "7-stage mitigation",
+          desc: language === "mr" ? "७-टप्प्यांची कृती योजना" : language === "hi" ? "7-चरणीय निवारण योजना" : "7-stage mitigation",
         },
         {
-          label: "Corridor Alerts",
+          label: language === "mr" ? "कॉरिडोर इशारे" : language === "hi" ? "कॉरिडोर अलर्ट" : "Corridor Alerts",
           href: "/alerts",
           icon: Bell,
           badge: activeAlerts > 0 ? String(activeAlerts) : undefined,
           badgeCls: "bg-amber-100 text-amber-700 border border-amber-200",
-          desc: "Active alerts feed",
+          desc: language === "mr" ? "सक्रिय सूचना व इशारे" : language === "hi" ? "सक्रिय अलर्ट फीड" : "Active alerts feed",
         },
         {
-          label: "Resource Logistics",
+          label: language === "mr" ? "संसाधने व रसद" : language === "hi" ? "संसाधन एवं रसद" : "Resource Logistics",
           href: "/resources",
           icon: Droplets,
-          desc: "Water, medical, sanitation",
+          desc: language === "mr" ? "पाणी, रुग्णालय, स्वच्छता" : language === "hi" ? "पानी, चिकित्सा, स्वच्छता" : "Water, medical, sanitation",
         },
       ],
     },
     {
       emoji: "🤖",
-      label: "AI & FORECASTING",
+      label: language === "mr" ? "AI व अंदाज" : language === "hi" ? "AI एवं पूर्वानुमान" : "AI & FORECASTING",
       color: "text-emerald-600",
       items: [
         {
-          label: "AI Operations Copilot",
+          label: language === "mr" ? "AI ऑपरेशन्स सहाय्यक" : language === "hi" ? "AI संचालन सहायक" : "AI Operations Copilot",
           href: "/copilot",
           icon: Bot,
           badge: "AI",
           badgeCls: "bg-emerald-100 text-emerald-800 border border-emerald-200",
-          desc: "Multilingual AI assistant",
+          desc: language === "mr" ? "बहुभाषिक AI सहाय्यक" : language === "hi" ? "बहुभाषी AI सहायक" : "Multilingual AI assistant",
         },
         {
-          label: "Crowd Density Forecast",
+          label: language === "mr" ? "गर्दी घनता अंदाज" : language === "hi" ? "भीड़ घनत्व पूर्वानुमान" : "Crowd Density Forecast",
           href: "/simulator",
           icon: Sliders,
-          desc: "Predictive modelling",
+          desc: language === "mr" ? "अंदाज व मॉडेलिंग" : language === "hi" ? "अनुमानित मॉडलिंग" : "Predictive modelling",
         },
       ],
     },
   ];
 
   const roleOptions: { role: Role; label: string }[] = [
-    { role: "COMMANDER", label: "Incident Commander" },
-    { role: "DINDI_LEADER", label: "Dindi Pramukh / Leader" },
-    { role: "VOLUNTEER", label: "Smart Seva Volunteer" },
-    { role: "POLICE", label: "Superintendent of Police" },
-    { role: "MEDICAL", label: "Chief Medical Officer" },
-    { role: "LOGISTICS", label: "Water & Logistics Officer" },
-    { role: "SANITATION", label: "Sanitation Head" },
+    { role: "COMMANDER", label: language === "mr" ? "इन्सपेक्टर / कमांडर" : language === "hi" ? "इंसिडेंट कमांडर" : "Incident Commander" },
+    { role: "DINDI_LEADER", label: language === "mr" ? "दिंडी प्रमुख / महाराज" : language === "hi" ? "दिंडी प्रमुख / महाराज" : "Dindi Pramukh / Leader" },
+    { role: "VOLUNTEER", label: language === "mr" ? "स्मार्ट सेवा स्वयंसेवक" : language === "hi" ? "स्मार्ट सेवा स्वयंसेवक" : "Smart Seva Volunteer" },
+    { role: "POLICE", label: language === "mr" ? "पोलीस अधीक्षक" : language === "hi" ? "पुलिस अधीक्षक" : "Superintendent of Police" },
+    { role: "MEDICAL", label: language === "mr" ? "मुख्य वैद्यकीय अधिकारी" : language === "hi" ? "मुख्य चिकित्सा अधिकारी" : "Chief Medical Officer" },
+    { role: "LOGISTICS", label: language === "mr" ? "पाणी व रसद अधिकारी" : language === "hi" ? "जल एवं रसद अधिकारी" : "Water & Logistics Officer" },
+    { role: "SANITATION", label: language === "mr" ? "स्वच्छता प्रमुख" : language === "hi" ? "स्वच्छता प्रमुख" : "Sanitation Head" },
   ];
 
   return (
@@ -240,25 +240,7 @@ export const Sidebar: React.FC = () => {
                     <div className="flex items-center gap-2.5">
                       <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-wari-orange" : "text-wari-textMuted"}`} />
                       <div>
-                        <div>
-                          {item.href === "/command-centre"
-                            ? t("nav.commandCenter")
-                            : item.href === "/map"
-                              ? t("nav.map")
-                              : item.href === "/alerts"
-                                ? t("nav.alerts")
-                                : item.href === "/resources"
-                                  ? t("nav.resources")
-                                  : item.href === "/copilot"
-                                    ? t("nav.copilot")
-                                    : item.href === "/simulator"
-                                      ? t("nav.simulator")
-                                      : item.href === "/volunteer"
-                                        ? t("nav.volunteers")
-                                        : item.href === "/dindi"
-                                          ? t("nav.dindis")
-                                          : item.label}
-                        </div>
+                        <div>{item.label}</div>
                         {!isActive && (item as any).desc && (
                           <div className="text-[9px] text-wari-textMuted font-normal leading-tight">{(item as any).desc}</div>
                         )}
@@ -299,7 +281,7 @@ export const Sidebar: React.FC = () => {
           {roleOpen && (
             <div className="absolute bottom-full left-2 right-2 mb-1 bg-white border border-wari-cardBorder rounded-2xl shadow-cardHov py-1.5 z-50 animate-fadeIn">
               <div className="px-3 py-1 text-[9px] font-bold text-wari-textMuted uppercase tracking-wider border-b border-wari-cardBorder mb-1">
-                Switch Role
+                {language === "mr" ? "भूमिका बदला" : language === "hi" ? "भूमिका बदलें" : "Switch Role"}
               </div>
               {roleOptions.map((r) => {
                 const Icon = ROLE_ICONS[r.role];
@@ -330,7 +312,7 @@ export const Sidebar: React.FC = () => {
             className="w-full py-1.5 px-3 rounded-xl text-[11px] text-wari-textMuted hover:text-red-600 hover:bg-red-50 border border-wari-cardBorder hover:border-red-200 flex items-center justify-center gap-1.5 transition-all"
           >
             <LogOut className="w-3 h-3" />
-            Sign Out
+            {language === "mr" ? "लॉग आउट करा" : language === "hi" ? "लॉग आउट करें" : "Sign Out"}
           </button>
         </div>
       </div>

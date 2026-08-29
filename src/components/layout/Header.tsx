@@ -11,7 +11,7 @@ import { fetchLiveWeather, WeatherData } from "@/lib/weather-service";
 export const Header: React.FC = () => {
   const { state, setIsSimulating } = useSimulation();
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [clock, setClock] = useState("");
 
@@ -50,7 +50,7 @@ export const Header: React.FC = () => {
               }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-current opacity-75" />
-              🟢 Live Mode
+              {language === "mr" ? "🟢 थेट मोड" : language === "hi" ? "🟢 लाइव मोड" : "🟢 Live Mode"}
             </button>
             <button
               onClick={() => setIsSimulating(true)}
@@ -61,7 +61,7 @@ export const Header: React.FC = () => {
               }`}
             >
               <Sparkles className="w-3 h-3" />
-              🧪 Demo Archive
+              {language === "mr" ? "🧪 डेमो पुराभिलेख" : language === "hi" ? "🧪 डेमो पुरालेख" : "🧪 Demo Archive"}
             </button>
           </div>
 
@@ -70,14 +70,14 @@ export const Header: React.FC = () => {
             {weather ? (
               <>
                 <WeatherIcon className="w-3.5 h-3.5 text-amber-500" />
-                <span className="text-wari-textSecond">Corridor:</span>
+                <span className="text-wari-textSecond">{language === "mr" ? "मार्ग:" : language === "hi" ? "मार्ग:" : "Corridor:"}</span>
                 <span className="font-bold text-wari-textPrimary">{weather.temperatureC}°C</span>
                 <span className={`ml-1 text-[9px] px-1.5 py-0.5 rounded font-bold ${weather.isLive ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
-                  {weather.isLive ? "LIVE" : "est."}
+                  {weather.isLive ? (language === "mr" ? "थेट" : language === "hi" ? "लाइव" : "LIVE") : "est."}
                 </span>
               </>
             ) : (
-              <span className="text-wari-textMuted">28°C Clear</span>
+              <span className="text-wari-textMuted">28°C {language === "mr" ? "निरभ्र" : language === "hi" ? "साफ" : "Clear"}</span>
             )}
           </div>
         </div>
@@ -89,7 +89,7 @@ export const Header: React.FC = () => {
             <Link href="/incidents">
               <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-bold animate-pulse">
                 <ShieldAlert className="w-3.5 h-3.5 text-red-500" />
-                {criticalCount} CRITICAL
+                {criticalCount} {language === "mr" ? "गंभीर" : language === "hi" ? "गंभीर" : "CRITICAL"}
               </div>
             </Link>
           )}
@@ -99,21 +99,21 @@ export const Header: React.FC = () => {
             href="/dindi"
             className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
           >
-            🚩 Dindi
+            {language === "mr" ? "🚩 दिंडी" : language === "hi" ? "🚩 दिंडी" : "🚩 Dindi"}
           </Link>
 
           <Link
             href="/volunteer"
             className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 rounded-xl text-xs font-bold transition-all"
           >
-            👷 Volunteer
+            {language === "mr" ? "👷 स्वयंसेवक" : language === "hi" ? "👷 स्वयंसेवक" : "👷 Volunteer"}
           </Link>
 
           <Link
             href="/command-centre"
             className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold transition-all"
           >
-            🏛️ Command
+            {language === "mr" ? "🏛️ कमांड" : language === "hi" ? "🏛️ कमान" : "🏛️ Command"}
           </Link>
 
           {/* User */}

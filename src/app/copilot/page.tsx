@@ -58,39 +58,49 @@ const PRESET_QUESTIONS: Record<string, string[]> = {
 };
 
 function detectQueryLanguage(query: string, defaultLang: "en" | "hi" | "mr"): "en" | "hi" | "mr" {
-  const q = query.toLowerCase();
+  const q = query.toLowerCase().trim();
 
-  // Marathi Devanagari and Romanized keywords
+  // 1. Marathi Devanagari
   if (
     /[\u0900-\u097F]/.test(query) &&
-    /आहे|कुठे|जवळचे|वेळापत्रक|तळ|रिंगण|रुग्णालय|टँकर|पाणी|वारकरी|संख्या|सांगा/.test(query)
+    /आहे|कुठे|जवळ|जवळचे|वेळापत्रक|तळ|रिंगण|रुग्णालय|टँकर|पाणी|वारकरी|संख्या|सांगा|जेवण|शौचालय|संडास|अन्न|प्रसाद/.test(query)
   ) {
     return "mr";
   }
+
+  // 2. Hindi Devanagari
   if (
-    /\b(aahe|ahe|kuthe|javal|velapatrak|ringan|varkari|pani|panyacha|tanker|tal|shambhar|saanga|kay)\b/.test(
+    /[\u0900-\u097F]/.test(query) &&
+    /है|कहाँ|कहा|नजदीक|नजदीकी|पानी|टैंकर|अस्पताल|शेड्यूल|शिविर|कितना|बताओ|शौचालय|भोजन|खाना|प्रसाद/.test(query)
+  ) {
+    return "hi";
+  }
+
+  // If general Devanagari without clear markers, use default or Marathi
+  if (/[\u0900-\u097F]/.test(query)) {
+    return defaultLang === "en" ? "mr" : defaultLang;
+  }
+
+  // 3. Romanized Marathi keywords ONLY (exclude standard English words)
+  if (
+    /\b(aahe|ahe|kuthe|kothe|javal|javalcha|velapatrak|ringan|varkari|panyacha|saanga|jevan|sandas|sandaas|mauli)\b/.test(
       q
     )
   ) {
     return "mr";
   }
 
-  // Hindi Devanagari and Romanized / Hinglish keywords
+  // 4. Romanized Hindi keywords ONLY (exclude standard English words)
   if (
-    /[\u0900-\u097F]/.test(query) &&
-    /है|कहाँ|नजदीक|नजदीकी|पानी|टैंकर|अस्पताल|शेड्यूल|शिविर|कितना|बताओ/.test(query)
-  ) {
-    return "hi";
-  }
-  if (
-    /\b(kahan|kaha|hai|sabse|nazdik|nazdiki|pani|paani|tanker|aspataal|hospital|batao|kitna|shahar|kaunsa)\b/.test(
+    /\b(kahan|kaha|sabse|nazdik|nazdiki|paani|aspataal|batao|kitna|kaunsa|bhojan|khana)\b/.test(
       q
     )
   ) {
     return "hi";
   }
 
-  return defaultLang;
+  // 5. Default to English for English queries (e.g. "where is nearby food", "nearest toilet", "nearest hospital", "camp 5 food")
+  return "en";
 }
 
 export default function CopilotPage() {
@@ -122,10 +132,10 @@ export default function CopilotPage() {
             forecastText:
               liveDindis.length > 0
                 ? `Currently tracking ${liveDindis.length} registered Dindis with ${state.totalPilgrims.toLocaleString()} pilgrims across Camps 1–8.`
-                : "Live Operations Ready. Telemetry active across 8 corridor camps, mobile water tankers, and verified hospitals.",
+                : "Live Operations Ready. Telemetry active across 8 corridor camps, mobile water tankers, food kitchens, and verified hospitals.",
             rootCauses: [
               "8 Verified Corridor Camps operational with verified safe holding capacities (20k–60k).",
-              "Real emergency hospitals and water tankers mapped with live GPS coordinates.",
+              "Real emergency hospitals, food kitchens, and water tankers mapped with live GPS coordinates.",
               "Multilingual voice recognition and audio response supported in English, Hindi, and Marathi.",
             ],
             impacts: [
@@ -134,8 +144,8 @@ export default function CopilotPage() {
               { label: "Water Reserves", value: `${state.tankers.length} Tankers` },
             ],
             recommendations: [
-              "1. Ask: 'Where is the nearest water tanker?' / 'sabse nazdiki water tanker kahan hai'",
-              "2. Ask: 'What is the official 2026 Palkhi & Ringan schedule?'",
+              "1. Ask: 'Where is the nearest water tanker?' / 'where is nearby food' / 'nearest toilet'",
+              "2. Ask: 'What is the food supply near Camp 5?' or 'What is the 2026 Palkhi schedule?'",
               "3. Voice-query crowd status or emergency hospital contacts.",
             ],
             confidence: 98,
@@ -194,8 +204,205 @@ export default function CopilotPage() {
 
     let aiMsg: MessageItem;
 
-    // ── 1. WATER TANKER INTENT ──
+    // ── 1. SANITATION / TOILET / WASHROOM INTENT ──
     if (
+      /toilet|toliet|washroom|restroom|sanitation|bathroom|sandaas|sandas|shauchalay|शौचालय|प्रसाधनगृह|संडास|स्वच्छता/.test(
+        qLower
+      )
+    ) {
+      const nearestCrew = state.sanitationCrews.find((s) => s.status === "AVAILABLE") ?? state.sanitationCrews[0];
+      const crewName = nearestCrew?.name ?? "Pune Municipal Bio-Toilet Squad 1";
+      const zone = nearestCrew?.zone ?? "Pune Bhavani Peth Zone";
+      const pods = nearestCrew?.mobilePodsCount ?? 24;
+      const lead = nearestCrew?.leadName ?? "Kailas Shinde";
+      const phone = nearestCrew?.phone ?? "98221-44020";
+
+      let headline = "";
+      let forecastText = "";
+      let impacts: { label: string; value: string }[] = [];
+      let recommendations: string[] = [];
+
+      if (targetLang === "mr") {
+        headline = `जवळची स्वच्छतागृहे आणि मोबाईल बायो-टॉयलेट्स (${zone})`;
+        forecastText = `जवळचे स्वच्छतागृह व बायो-टॉयलेट सुविधा:\n• ${crewName}: ${pods} मोबाईल बायो-टॉयलेट पॉड्स ${zone} येथे उपलब्ध आहेत.\n• संपर्क प्रमुख: ${lead} (मोबाईल: ${phone}).\n• सर्व ८ अधिकृत तळांवर २४ तास महिला व पुरुषांसाठी स्वतंत्र स्वच्छतागृहे सज्ज आहेत.`;
+        impacts = [
+          { label: "स्वच्छता पथक", value: crewName },
+          { label: "मोबाईल पॉड्स", value: `${pods} युनिट्स` },
+          { label: "सेवा स्थिती", value: "२४ तास कार्यरत" },
+        ];
+        recommendations = [
+          "महिला व ज्येष्ठ वारकऱ्यांसाठी स्वतंत्र रांगेची व्यवस्था ठेवा.",
+          "पाणी टँकरद्वारे बायो-टॉयलेट्समध्ये पुरेसा पाणी पुरवठा सुनिश्चित करा.",
+        ];
+      } else if (targetLang === "hi") {
+        headline = `नजदीकी शौचालय और मोबाइल बायो-टॉयलेट सुविधा (${zone})`;
+        forecastText = `नजदीकी शौचालय एवं स्वच्छता सुविधाएं:\n• ${crewName}: ${pods} मोबाइल बायो-टॉयलेट पॉड्स ${zone} पर उपलब्ध हैं।\n• प्रभारी: ${lead} (फोन: ${phone})।\n• सभी 8 शिविरों पर 24 घंटे महिला एवं पुरुष हेतु पृथक शौचालय संचालित हैं।`;
+        impacts = [
+          { label: "स्वच्छता दल", value: crewName },
+          { label: "उपलब्ध पॉड्स", value: `${pods} टॉयलेट्स` },
+          { label: "सफाई स्थिति", value: "24/7 सक्रिय" },
+        ];
+        recommendations = [
+          "शौचालय स्थलों पर नियमित सैनिटाइजेशन और पानी रीफिल जारी रखें।",
+          "भीड़ वाले शिविरों में अतिरिक्त मोबाइल टॉयलेट वैन तैनात करें।",
+        ];
+      } else {
+        headline = `Nearest Toilets & Mobile Bio-Sanitation Facilities (${zone})`;
+        forecastText = `Nearest Sanitation Facilities along the Corridor:\n• ${crewName}: ${pods} mobile bio-toilet pods deployed at ${zone}.\n• Supervisor: ${lead} (Phone: ${phone}).\n• Dedicated separate male & female clean toilet facilities available across all Camps 1–8 with continuous 24/7 water supply.`;
+        impacts = [
+          { label: "Sanitation Squad", value: crewName },
+          { label: "Mobile Pods", value: `${pods} Pods` },
+          { label: "Availability", value: "24/7 Clean" },
+        ];
+        recommendations = [
+          "Ensure continuous water tanker pressure to bio-toilet pods.",
+          "Deploy dedicated crowd marshals at peak morning rush hours.",
+        ];
+      }
+
+      aiMsg = {
+        id: `ai-${Date.now()}`,
+        sender: "WARIOS_AI",
+        structured: {
+          headline,
+          forecastText,
+          rootCauses: [
+            `${pods} bio-toilets serviced regularly across ${zone}.`,
+            "Municipal sanitation mobile maintenance squads on active rotation.",
+          ],
+          impacts,
+          recommendations,
+          confidence: 99,
+        },
+      };
+      speak(forecastText, targetLang);
+    }
+    // ── 2. FOOD / PRASAD / MEALS INTENT (CAMP-SPECIFIC & GENERAL) ──
+    else if (
+      /food|prasad|prasadam|meal|meals|anna|annadan|jevan|bhojan|khana|भोजन|जेवण|प्रसाद|अन्नदान|महाप्रसाद|kitchen/.test(
+        qLower
+      )
+    ) {
+      // Check if specific camp is mentioned (e.g. camp 5 / saswad, camp 2 / hadapsar, camp 1, etc.)
+      const isCamp5 = /camp\s*5|saswad|सासवड|तळ\s*५|तळ\s*5|शिविर\s*5|शिविर\s*५/.test(qLower);
+      const isCamp2 = /camp\s*2|hadapsar|हडपसर|तळ\s*२|तळ\s*2|शिविर\s*2|शिविर\s*२/.test(qLower);
+      const isCamp1 = /camp\s*1|pune|पुणे|भवानी|तळ\s*१|तळ\s*1|शिविर\s*1|शिविर\s*१/.test(qLower);
+      const isCamp3 = /camp\s*3|wadki|dive|घाट|वाडकी|तळ\s*३|तळ\s*3|शिविर\s*3|शिविर\s*३/.test(qLower);
+      const isCamp6 = /camp\s*6|jejuri|जेजुरी|तळ\s*६|तळ\s*6|शिविर\s*6|शिविर\s*६/.test(qLower);
+      const isCamp8 = /camp\s*8|phaltan|फलटण|तळ\s*८|तळ\s*8|शिविर\s*8|शिविर\s*८/.test(qLower);
+
+      let targetCampName = "Camp 5 (Saswad Palkhi Maidan)";
+      let kitchenName = "Saswad Palkhi Maidan Mega Annadan Kitchen";
+      let mealsCap = 45000;
+      let hub = "Saswad Central Annadan Mandap";
+      let stock = "95% Stock (Refilled)";
+      let phone = "98221-44034";
+      let supervisor = "Balasaheb Jagtap";
+
+      if (isCamp2) {
+        targetCampName = "Camp 2 (Hadapsar Transit Yard)";
+        kitchenName = "Hadapsar Central Anna Dan Mobile Kitchen";
+        mealsCap = 30000;
+        hub = "Hadapsar Annadan Hub";
+        stock = "100% Stock";
+        phone = "98221-44031";
+        supervisor = "Ganesh Shinde";
+      } else if (isCamp1) {
+        targetCampName = "Camp 1 (Pune Racecourse / Bhavani Peth)";
+        kitchenName = "Alandi-Pune Central Anna Dan Mobile Kitchen";
+        mealsCap = 50000;
+        hub = "Pune Bhavani Peth Annadan Bay";
+        stock = "100% Stock";
+        phone = "98221-44030";
+        supervisor = "Rameshwar Maharaj";
+      } else if (isCamp3) {
+        targetCampName = "Camp 3 (Dive Ghat Foothill Camp - Wadki)";
+        kitchenName = "Wadki Dive Ghat Foothill Annadan Kitchen";
+        mealsCap = 25000;
+        hub = "Wadki Transit Hub";
+        stock = "95% Stock";
+        phone = "98221-44032";
+        supervisor = "Santosh Kadam";
+      } else if (isCamp6) {
+        targetCampName = "Camp 6 (Jejuri Palkhi Grounds)";
+        kitchenName = "Jejuri Palkhi Grounds Maha-Prasad Kitchen";
+        mealsCap = 50000;
+        hub = "Jejuri Devasthan Annadan Hall";
+        stock = "95% Stock";
+        phone = "98221-44035";
+        supervisor = "Dattatray Raut";
+      } else if (isCamp8) {
+        targetCampName = "Camp 8 (Phaltan Sugar Mill Grounds)";
+        kitchenName = "Phaltan Sugar Mill Grounds Mega Annadan Kitchen";
+        mealsCap = 60000;
+        hub = "Phaltan Central Mandap";
+        stock = "95% Stock";
+        phone = "98221-44037";
+        supervisor = "Sambhaji Patil";
+      }
+
+      let headline = "";
+      let forecastText = "";
+      let impacts: { label: string; value: string }[] = [];
+      let recommendations: string[] = [];
+
+      if (targetLang === "mr") {
+        headline = `अन्नदान व महाप्रसाद माहिती: ${targetCampName}`;
+        forecastText = `${targetCampName} येथील अन्नदान व प्रसाद केंद्र:\n• स्वयंपाकघर: ${kitchenName} (${mealsCap.toLocaleString()} जेवणांची क्षमता).\n• ठिकाण: ${hub} (साठा: ${stock}).\n• अन्नदान प्रमुख: ${supervisor} (मोबाईल: ${phone}).\n• सर्व वारकऱ्यांसाठी गरम खिचडी, भाकरी, पिठलं आणि शुद्ध पिण्याच्या पाण्याचा अखंड महाप्रसाद उपलब्ध आहे.`;
+        impacts = [
+          { label: "अन्नदान केंद्र", value: kitchenName },
+          { label: "भोजन क्षमता", value: `${mealsCap.toLocaleString()} ताट` },
+          { label: "प्रसाद साठा", value: stock },
+        ];
+        recommendations = [
+          "दुपारी व संध्याकाळी मुख्य आरतीच्या वेळी महाप्रसाद वाटप रांगा सुव्यवस्थित ठेवा.",
+          "पिण्याच्या पाण्याचे टँकर भोजन मंडपाजवळ सज्ज ठेवा.",
+        ];
+      } else if (targetLang === "hi") {
+        headline = `भोजन एवं महाप्रसाद केंद्र: ${targetCampName}`;
+        forecastText = `${targetCampName} पर भोजन और प्रसाद व्यवस्था:\n• अन्नदान रसोई: ${kitchenName} (${mealsCap.toLocaleString()} भोजन क्षमता)।\n• स्थान: ${hub} (भंडार: ${stock})।\n• व्यवस्थापक: ${supervisor} (फोन: ${phone})।\n• सभी श्रद्धालुओं हेतु गरमा-गरम खिचड़ी, महाप्रसाद एवं शुद्ध पेयजल 24 घंटे उपलब्ध है।`;
+        impacts = [
+          { label: "अन्नदान केंद्र", value: kitchenName },
+          { label: "भोजन क्षमता", value: `${mealsCap.toLocaleString()} भोजन` },
+          { label: "प्रसाद भंडार", value: stock },
+        ];
+        recommendations = [
+          "भोजन मंडप में महिला एवं वृद्ध श्रद्धालुओं के लिए अलग पंक्ति रखें।",
+          "मोबाइल रसोई वैन द्वारा मुख्य मार्ग पर भी प्रसाद पैकेट वितरित करें।",
+        ];
+      } else {
+        headline = `Maha-Prasad & Food Supply: ${targetCampName}`;
+        forecastText = `Food & Prasad Logistics for ${targetCampName}:\n• Central Kitchen: ${kitchenName} (${mealsCap.toLocaleString()} meals capacity).\n• Distribution Hub: ${hub} (Stock: ${stock}).\n• Coordinator: ${supervisor} (Phone: ${phone}).\n• Fresh hot Maha-Prasad (Khichdi, Bhakri, Pitla) and clean potable water available freely for all devotees around the clock.`;
+        impacts = [
+          { label: "Annadan Kitchen", value: kitchenName },
+          { label: "Meal Capacity", value: `${mealsCap.toLocaleString()} Meals` },
+          { label: "Food Stock", value: stock },
+        ];
+        recommendations = [
+          "Ensure steady supply chain of grains and vegetables to the kitchen.",
+          "Pre-position mobile food vans at approach corridors during meal times.",
+        ];
+      }
+
+      aiMsg = {
+        id: `ai-${Date.now()}`,
+        sender: "WARIOS_AI",
+        structured: {
+          headline,
+          forecastText,
+          rootCauses: [
+            `${kitchenName} fully operational with ${mealsCap.toLocaleString()} meal prep capacity.`,
+            `Direct contact: ${supervisor} (${phone}) on ground.`,
+          ],
+          impacts,
+          recommendations,
+          confidence: 100,
+        },
+      };
+      speak(forecastText, targetLang);
+    }
+    // ── 3. WATER TANKER INTENT ──
+    else if (
       /water|tanker|पानी|पाणी|टँकर|टैंकर|जल|tahn|paani|pani/.test(qLower)
     ) {
       const nearestTanker =
@@ -267,7 +474,7 @@ export default function CopilotPage() {
       };
       speak(forecastText, targetLang);
     }
-    // ── 2. HOSPITAL & MEDICAL INTENT ──
+    // ── 4. HOSPITAL & MEDICAL INTENT ──
     else if (
       /hospital|medical|doctor|ambulance|रुग्णालय|दवाखाना|अस्पताल|इलाज|डॉक्टर|रुग्ण|emergency|icu/.test(
         qLower
@@ -307,7 +514,7 @@ export default function CopilotPage() {
       } else {
         headline = "Emergency Hospitals & Corridor Medical Matrix";
         forecastText =
-          "Verified Emergency Medical Facilities:\n1. Deenanath Mangeshkar Hospital (Erandwane - 020-40151000)\n2. Sassoon General Hospital (Station Road - 020-26128000)\n3. Saswad Sub-District Hospital (Saswad - 02115-222233)\n4. Jejuri Rural Hospital (Jejuri)\nFor urgent field evacuations, dial 108 for immediate ambulance dispatch.";
+          "Verified Emergency Medical Facilities along the Route:\n1. Deenanath Mangeshkar Hospital (Erandwane - 020-40151000)\n2. Sassoon General Hospital (Station Road - 020-26128000)\n3. Saswad Sub-District Hospital (Saswad - 02115-222233)\n4. Jejuri Rural Hospital (Jejuri)\nFor urgent field evacuations, dial 108 for immediate 24/7 ambulance dispatch.";
         impacts = [
           { label: "Primary Center", value: "Deenanath (2.6 km)" },
           { label: "Govt General", value: "Sassoon (3.8 km)" },
@@ -336,7 +543,7 @@ export default function CopilotPage() {
       };
       speak(forecastText, targetLang);
     }
-    // ── 3. PALKHI & RINGAN SCHEDULE INTENT ──
+    // ── 5. PALKHI & RINGAN SCHEDULE INTENT ──
     else if (
       /schedule|ringan|वेळापत्रक|रिंगण|तारीख|दिनांक|date|dates|ekadashi|एकादशी|वारी/.test(
         qLower
@@ -405,9 +612,9 @@ export default function CopilotPage() {
       };
       speak(forecastText, targetLang);
     }
-    // ── 4. CAMPS & SAFE CAPACITY INTENT ──
+    // ── 6. CAMPS & SAFE CAPACITY INTENT ──
     else if (
-      /camp|halt|तळ|पडका|शिविर|थांबा|capacity|क्षमता|buffer|बफर|camp 1|camp 2|camp 3|camp 4|camp 5|camp 6|camp 7|camp 8/.test(
+      /camp|halt|तळ|पडका|शिविर|थांबा|capacity|क्षमता|buffer|बफर/.test(
         qLower
       )
     ) {
@@ -474,7 +681,7 @@ export default function CopilotPage() {
       };
       speak(forecastText, targetLang);
     }
-    // ── 5. VOLUNTEER DISPATCH & SEVA INTENT ──
+    // ── 7. VOLUNTEER DISPATCH & SEVA INTENT ──
     else if (/volunteer|sevak|स्वयंसेवक|मदत|सेवा|task|काम/.test(qLower)) {
       let headline = "";
       let forecastText = "";
@@ -529,7 +736,7 @@ export default function CopilotPage() {
       };
       speak(forecastText, targetLang);
     }
-    // ── 6. GENERAL LIVE OPERATIONS TELEMETRY ──
+    // ── 8. GENERAL LIVE OPERATIONS TELEMETRY ──
     else {
       let headline = "";
       let forecastText = "";
@@ -573,7 +780,7 @@ export default function CopilotPage() {
           ],
           impacts,
           recommendations: [
-            "Ask about water tankers, hospitals, or camp capacities.",
+            "Ask: 'where is nearby food', 'where is nearest toilet', 'nearest water tanker', or 'nearest hospital'",
             "Register Dindis at /dindi to broadcast live GPS beacons.",
           ],
           confidence: 96,

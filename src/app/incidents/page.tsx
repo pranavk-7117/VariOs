@@ -352,10 +352,11 @@ export default function IncidentsPage() {
                               Batch 1 • {syncPlan.dindiShortRoute.arrivalWindow}
                             </span>
                           </div>
-                          <p className="text-[11px] text-emerald-900">
-                            <strong>Route:</strong> {syncPlan.dindiShortRoute.routeName} ({syncPlan.dindiShortRoute.distanceKm} km, {syncPlan.dindiShortRoute.paceKmH} km/h).
-                          </p>
-                          <p className="text-[11px] text-emerald-800 bg-white/80 p-2 rounded-lg border border-emerald-200">
+                          <div className="text-[11px] text-emerald-900 space-y-1">
+                            <p><strong>Assigned Route:</strong> {syncPlan.dindiShortRoute.routeName}</p>
+                            <p className="text-[10px] text-emerald-700 font-mono">📍 Path: {syncPlan.dindiShortRoute.routeWaypoints} ({syncPlan.dindiShortRoute.distanceKm} km · {syncPlan.dindiShortRoute.paceKmH} km/h)</p>
+                          </div>
+                          <p className="text-[11px] text-emerald-800 bg-white/80 p-2.5 rounded-lg border border-emerald-200">
                             ✓ {syncPlan.dindiShortRoute.actionNote}
                           </p>
                         </div>
@@ -372,13 +373,25 @@ export default function IncidentsPage() {
                               Batch 2 • {syncPlan.dindiLongRoute.arrivalWindow}
                             </span>
                           </div>
-                          <p className="text-[11px] text-purple-900">
-                            <strong>Route:</strong> {syncPlan.dindiLongRoute.routeName} ({syncPlan.dindiLongRoute.distanceKm} km, {syncPlan.dindiLongRoute.paceKmH} km/h).
-                          </p>
-                          <p className="text-[11px] text-purple-800 bg-white/80 p-2 rounded-lg border border-purple-200">
+                          <div className="text-[11px] text-purple-900 space-y-1">
+                            <p><strong>Assigned Route:</strong> {syncPlan.dindiLongRoute.routeName}</p>
+                            <p className="text-[10px] text-purple-700 font-mono">📍 Path: {syncPlan.dindiLongRoute.routeWaypoints} ({syncPlan.dindiLongRoute.distanceKm} km · {syncPlan.dindiLongRoute.paceKmH} km/h)</p>
+                          </div>
+                          <p className="text-[11px] text-purple-800 bg-white/80 p-2.5 rounded-lg border border-purple-200">
                             ✓ {syncPlan.dindiLongRoute.actionNote}
                           </p>
                         </div>
+                      </div>
+
+                      {/* AI Optimization Rationale Box */}
+                      <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl text-xs space-y-1">
+                        <span className="font-bold text-amber-950 flex items-center gap-1.5 text-[11px]">
+                          <span>💡</span>
+                          <span>Logistics Optimization Rationale:</span>
+                        </span>
+                        <p className="text-[11px] text-amber-900 leading-relaxed">
+                          {syncPlan.optimizationRationale}
+                        </p>
                       </div>
 
                       {/* Advance Logistics Notification Schedule */}

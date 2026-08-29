@@ -869,25 +869,36 @@ export default function CommandCentre() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div className="p-3 bg-white/90 rounded-xl border border-emerald-200 space-y-1">
+                <div className="p-3 bg-white/90 rounded-xl border border-emerald-200 space-y-1.5">
                   <div className="flex items-center justify-between font-bold text-emerald-950 text-[11px]">
-                    <span>{syncPlan.dindiShortRoute.dindi.name} (Shortest Route)</span>
+                    <span>{syncPlan.dindiShortRoute.dindi.name} (Shortest Direct Route)</span>
                     <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-mono">Batch 1 · {syncPlan.dindiShortRoute.arrivalWindow}</span>
                   </div>
-                  <p className="text-[10px] text-emerald-800">
-                    Route: {syncPlan.dindiShortRoute.routeName} ({syncPlan.dindiShortRoute.distanceKm} km, {syncPlan.dindiShortRoute.paceKmH} km/h).
+                  <p className="text-[11px] text-emerald-900 font-semibold">
+                    Route: {syncPlan.dindiShortRoute.routeName}
+                  </p>
+                  <p className="text-[10px] text-emerald-700 font-mono">
+                    📍 Path: {syncPlan.dindiShortRoute.routeWaypoints} ({syncPlan.dindiShortRoute.distanceKm} km · {syncPlan.dindiShortRoute.paceKmH} km/h)
                   </p>
                 </div>
 
-                <div className="p-3 bg-white/90 rounded-xl border border-purple-200 space-y-1">
+                <div className="p-3 bg-white/90 rounded-xl border border-purple-200 space-y-1.5">
                   <div className="flex items-center justify-between font-bold text-purple-950 text-[11px]">
-                    <span>{syncPlan.dindiLongRoute.dindi.name} (Scenic Bypass)</span>
+                    <span>{syncPlan.dindiLongRoute.dindi.name} (Scenic Riverside Bypass)</span>
                     <span className="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded font-mono">Batch 2 · {syncPlan.dindiLongRoute.arrivalWindow}</span>
                   </div>
-                  <p className="text-[10px] text-purple-800">
-                    Route: {syncPlan.dindiLongRoute.routeName} ({syncPlan.dindiLongRoute.distanceKm} km, {syncPlan.dindiLongRoute.paceKmH} km/h).
+                  <p className="text-[11px] text-purple-900 font-semibold">
+                    Route: {syncPlan.dindiLongRoute.routeName}
+                  </p>
+                  <p className="text-[10px] text-purple-700 font-mono">
+                    📍 Path: {syncPlan.dindiLongRoute.routeWaypoints} ({syncPlan.dindiLongRoute.distanceKm} km · {syncPlan.dindiLongRoute.paceKmH} km/h)
                   </p>
                 </div>
+              </div>
+
+              <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl text-xs space-y-0.5">
+                <span className="text-[10px] font-bold text-amber-950 uppercase tracking-tight">💡 Logistics Optimization Rationale</span>
+                <p className="text-[11px] text-amber-900 leading-relaxed">{syncPlan.optimizationRationale}</p>
               </div>
             </div>
           )}

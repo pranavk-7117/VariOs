@@ -34,15 +34,45 @@ export default function VolunteerPortal() {
   const [reportSuccess, setReportSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"tasks" | "report" | "dindis" | "team">("tasks");
   const [selectedCampId, setSelectedCampId] = useState<string>("ALL");
-  const [reportCampId, setReportCampId] = useState<string>("CAMP-01");
+  const [reportCampId, setReportCampId] = useState<string>("AUTO");
   const [remarksByTask, setRemarksByTask] = useState<Record<string, string>>({});
 
-  // Sync reportCampId when top filter changes to a specific camp
-  React.useEffect(() => {
-    if (selectedCampId !== "ALL") {
-      setReportCampId(selectedCampId);
-    }
-  }, [selectedCampId]);
+  // Auto-detect nearest camp from live GPS coordinates
+  const autoDetectedCamp = React.useMemo(() => {
+    if (!coords) return state.camps[0];
+    return (
+      state.camps
+        .map((c) => ({
+          camp: c,
+          dist: Math.round(
+            6371 *
+              2 *
+              Math.atan2(
+                Math.sqrt(
+                  Math.sin(((c.lat - coords.lat) * Math.PI) / 360) ** 2 +
+                    Math.cos((coords.lat * Math.PI) / 180) *
+                      Math.cos((c.lat * Math.PI) / 180) *
+                      Math.sin(((c.lng - coords.lng) * Math.PI) / 360) ** 2
+                ),
+                Math.sqrt(
+                  1 -
+                    (Math.sin(((c.lat - coords.lat) * Math.PI) / 360) ** 2 +
+                      Math.cos((coords.lat * Math.PI) / 180) *
+                        Math.cos((c.lat * Math.PI) / 180) *
+                        Math.sin(((c.lng - coords.lng) * Math.PI) / 360) ** 2)
+                )
+              ) *
+              10
+          ) / 10,
+        }))
+        .sort((a, b) => a.dist - b.dist)[0]?.camp ?? state.camps[0]
+    );
+  }, [coords, state.camps]);
+
+  const effectiveReportCamp =
+    reportCampId === "AUTO"
+      ? autoDetectedCamp
+      : state.camps.find((c) => c.id === reportCampId) ?? autoDetectedCamp;
 
   // Filter tasks by selected camp (or show all)
   const filteredTasks = state.volunteerTasks.filter((t) =>
@@ -53,18 +83,23 @@ export default function VolunteerPortal() {
   const realDindis = state.dindis.filter((d) => d.isCustomRegistered);
 
   const handle1TapReport = (label: string, _emoji: string, severity: "HIGH" | "CRITICAL" | "MEDIUM", customCampId?: string) => {
-    const targetId = customCampId || (reportCampId !== "ALL" ? reportCampId : selectedCampId !== "ALL" ? selectedCampId : "CAMP-01");
-    const targetCamp = state.camps.find((c) => c.id === targetId) ?? state.camps[0];
+    const targetCamp = customCampId
+      ? state.camps.find((c) => c.id === customCampId) ?? effectiveReportCamp
+      : effectiveReportCamp;
 
     reportVolunteerIncident({
       label,
       severity,
       campId: targetCamp.id,
-      lat: targetCamp.lat,
-      lng: targetCamp.lng,
+      lat: coords?.lat ?? targetCamp.lat,
+      lng: coords?.lng ?? targetCamp.lng,
     });
 
-    setReportSuccess(`${label} reported for ${targetCamp.name}`);
+    setReportSuccess(
+      `${label} reported at ${targetCamp.name} ${
+        coords ? `(Live User GPS: ${coords.lat.toFixed(4)}°N, ${coords.lng.toFixed(4)}°E)` : ""
+      }`
+    );
     setTimeout(() => setReportSuccess(null), 6000);
   };
 
@@ -389,24 +424,47 @@ export default function VolunteerPortal() {
               </div>
             </div>
 
-            {/* Target Camp Selector for Reporting */}
-            <div className="p-3.5 bg-red-50/60 rounded-xl border border-red-200 space-y-2">
-              <div className="flex items-center justify-between">
+            {/* Target Location Box for Reporting */}
+            <div className="p-3.5 bg-red-50/60 rounded-xl border border-red-200 space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                 <span className="text-xs font-bold text-red-950 uppercase tracking-wider flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-red-600" />
-                  Select Target Camp for Incident
+                  <MapPin className="w-3.5 h-3.5 text-red-600 animate-pulse" />
+                  Incident Reporting Location
                 </span>
-                <span className="text-[11px] font-bold text-red-800 bg-red-100 px-2.5 py-0.5 rounded-full">
-                  {state.camps.find((c) => c.id === reportCampId)?.name ?? "Camp 1"}
+                <span className="text-[11px] font-bold text-red-900 bg-red-100 px-2.5 py-0.5 rounded-full self-start sm:self-auto">
+                  {reportCampId === "AUTO"
+                    ? `📍 Auto-GPS: ${effectiveReportCamp.name}`
+                    : `📌 Manual: ${effectiveReportCamp.name}`}
                 </span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1.5 pt-1">
+
+              {coords && reportCampId === "AUTO" && (
+                <div className="text-[11px] text-emerald-800 font-semibold bg-emerald-50 border border-emerald-200 p-2 rounded-lg flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  <span>
+                    Auto-attached user phone GPS: <strong>{coords.lat.toFixed(5)}°N, {coords.lng.toFixed(5)}°E</strong> (Resolved to {autoDetectedCamp.name})
+                  </span>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => setReportCampId("AUTO")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    reportCampId === "AUTO"
+                      ? "bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-300"
+                      : "bg-white text-emerald-950 border border-emerald-300 hover:bg-emerald-50"
+                  }`}
+                >
+                  <span>📍 Auto Live GPS</span>
+                </button>
                 {state.camps.slice(0, 6).map((c, idx) => (
                   <button
                     key={c.id}
                     type="button"
                     onClick={() => setReportCampId(c.id)}
-                    className={`px-2.5 py-2 rounded-xl text-xs font-bold transition-all truncate text-center ${
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all truncate text-center ${
                       reportCampId === c.id
                         ? "bg-red-600 text-white shadow-sm ring-2 ring-red-300"
                         : "bg-white text-red-950 border border-red-200 hover:bg-red-100/60"

@@ -106,7 +106,9 @@ export type VolunteerSkill =
 
 export interface Volunteer {
   id: string;
+  assignedCampId?: string;
   name: string;
+  phone?: string;
   skills: VolunteerSkill[];
   locationName: string;
   lat: number;
@@ -116,6 +118,21 @@ export interface Volunteer {
   status: "AVAILABLE" | "DEPLOYED" | "ON_BREAK";
   currentTask?: string;
   avatarColor: string;
+}
+
+export interface VolunteerTask {
+  id: string;
+  campId?: string;
+  campName: string;
+  volunteerId: string;
+  volunteerName: string;
+  title: string;
+  type: "WATER_TANKER" | "MEDICAL" | "HALT" | "CROWD" | "SANITATION" | "GENERAL";
+  etaMinutes: number;
+  status: "ASSIGNED" | "IN_PROGRESS" | "VERIFIED" | "REJECTED";
+  remarks?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface MedicalStation {
@@ -218,6 +235,7 @@ export interface SimulationState {
   volunteers: Volunteer[];
   medicalStations: MedicalStation[];
   sanitationCrews: SanitationCrew[];
+  volunteerTasks: VolunteerTask[];
   alerts: Alert[];
   events: OperationalEvent[];
   activeIncidentId: string | null;

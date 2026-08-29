@@ -3,6 +3,9 @@
 import { useState, useCallback, useEffect } from "react";
 import { useLiveGps } from "@/context/LiveGpsContext";
 import { useSimulation } from "@/context/SimulationContext";
+import { Mic, MicOff } from "lucide-react";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { parseDindiRegistrationSpeech } from "@/lib/speech-intents";
 
 type Stage = "IDLE" | "FORM" | "REGISTERING" | "ACTIVE";
 
@@ -16,8 +19,9 @@ interface RegistrationResult {
 }
 
 export default function DindiLeaderRegisterCard() {
-  const { coords, isTracking, toggleTracking } = useLiveGps();
-  const { registerDynamicDindi, requestLeaderAssistance, addEventLog } = useSimulation();
+  const { coords, isTracking, toggleTracking, setBoundDindiId } = useLiveGps();
+  const { registerDynamicDindi, updateLiveDindiLocation, requestLeaderAssistance, addEventLog } = useSimulation();
+  const { transcript, isListening, isSupported, startListening, reset } = useSpeechRecognition();
 
   const [stage, setStage] = useState<Stage>("IDLE");
   const [form, setForm] = useState({
@@ -32,10 +36,24 @@ export default function DindiLeaderRegisterCard() {
   const [livePos, setLivePos] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
+    if (!transcript || stage !== "FORM") return;
+    const parsed = parseDindiRegistrationSpeech(transcript);
+    setForm((prev) => ({
+      ...prev,
+      leader: parsed.leader || prev.leader,
+      mandal: parsed.mandal || prev.mandal,
+      count: parsed.count || prev.count,
+    }));
+  }, [transcript, stage]);
+
+  useEffect(() => {
     if (coords && stage === "ACTIVE") {
       setLivePos({ lat: coords.lat, lng: coords.lng });
+      if (result) {
+        updateLiveDindiLocation(result.dindiId, coords.lat, coords.lng, coords.speedKmH);
+      }
     }
-  }, [coords, stage]);
+  }, [coords, stage, result, updateLiveDindiLocation]);
 
   const startRegistration = useCallback(() => {
     if (!form.leader.trim() || !form.mandal.trim()) {
@@ -59,6 +77,7 @@ export default function DindiLeaderRegisterCard() {
         leader: form.leader,
         count: parseInt(form.count, 10) || 100,
       });
+      setBoundDindiId(form.mandal);
       setLivePos({ lat, lng });
       setStage("ACTIVE");
       if (!isTracking) toggleTracking();
@@ -74,7 +93,7 @@ export default function DindiLeaderRegisterCard() {
       () => doRegister(17.6731, 75.3287),
       { enableHighAccuracy: true, timeout: 8000 }
     );
-  }, [form, registerDynamicDindi, isTracking, toggleTracking]);
+  }, [form, registerDynamicDindi, isTracking, toggleTracking, setBoundDindiId]);
 
   const sendAssistance = (type: "WATER" | "MEDICAL" | "HALT") => {
     const posStr = livePos
@@ -139,6 +158,29 @@ export default function DindiLeaderRegisterCard() {
         </div>
 
         <div className="space-y-3">
+          <div className="rounded-xl bg-white border border-orange-200 p-3 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex-1">
+              <p className="text-xs font-bold text-orange-900">Voice Fill</p>
+              <p className="text-[11px] text-stone-600">
+                Say: "My name is Pranav, mandal name Dindi A, count 500" or Hindi/Marathi equivalents.
+              </p>
+              {transcript && <p className="mt-1 text-[11px] text-emerald-700 font-medium">Heard: {transcript}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={isListening ? reset : startListening}
+              disabled={!isSupported}
+              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 ${
+                isListening
+                  ? "bg-red-100 text-red-700 border border-red-200"
+                  : "bg-orange-600 text-white hover:bg-orange-700"
+              } disabled:bg-stone-100 disabled:text-stone-400`}
+            >
+              {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+              {isListening ? "Listening" : "Speak Details"}
+            </button>
+          </div>
+
           <div>
             <label className="text-xs font-semibold text-stone-600 block mb-1">Leader / Volunteer Name *</label>
             <input

@@ -15,6 +15,7 @@ import {
 import { useSimulation } from "@/context/SimulationContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { formatLiveClusterAnswer, getLiveCrowdClusters } from "@/lib/live-ops";
 
 interface MessageItem {
   id: string;
@@ -114,8 +115,33 @@ export default function CopilotPage() {
 
     let aiMsg: MessageItem;
     const lower = query.toLowerCase();
+    const liveClusters = getLiveCrowdClusters(state);
+    const topLiveCluster = liveClusters[0];
+    const asksLiveCrowd =
+      lower.includes("dindi") ||
+      lower.includes("dhindi") ||
+      lower.includes("mmcoe") ||
+      lower.includes("overcrowd") ||
+      lower.includes("crowd") ||
+      lower.includes("camp") ||
+      lower.includes("halt") ||
+      lower.includes("rest") ||
+      lower.includes("resource") ||
+      lower.includes("water") ||
+      lower.includes("medical") ||
+      lower.includes("sanitation");
 
-    if (
+    if (!state.isSimulating && topLiveCluster && asksLiveCrowd) {
+      const liveAnswer = formatLiveClusterAnswer(topLiveCluster);
+      aiMsg = {
+        id: `ai-${Date.now()}`,
+        sender: "WARIOS_AI",
+        structured: {
+          ...liveAnswer,
+          confidence: 94,
+        },
+      };
+    } else if (
       lower.includes("code") ||
       lower.includes("passcode") ||
       lower.includes("कोड") ||

@@ -10,10 +10,14 @@ import {
   Trash2,
 } from "lucide-react";
 import { useSimulation } from "@/context/SimulationContext";
+import { getLiveCrowdClusters } from "@/lib/live-ops";
 
 export default function ResourcesPage() {
   const { state, dispatchTankerT03, isMitigated } = useSimulation();
   const [resourceTab, setResourceTab] = useState<"WATER" | "FOOD" | "SANITATION">("WATER");
+  const liveClusters = getLiveCrowdClusters(state);
+  const topLiveCluster = liveClusters[0];
+  const isLiveMode = !state.isSimulating;
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -44,7 +48,7 @@ export default function ResourcesPage() {
             }`}
           >
             <Droplets className="w-3.5 h-3.5" />
-            <span>Water Fleet (6)</span>
+            <span>Water Fleet ({state.tankers.length})</span>
           </button>
           <button
             onClick={() => setResourceTab("FOOD")}
@@ -55,7 +59,7 @@ export default function ResourcesPage() {
             }`}
           >
             <Utensils className="w-3.5 h-3.5" />
-            <span>Prasad & Food (8)</span>
+            <span>Prasad & Food ({state.camps.length})</span>
           </button>
           <button
             onClick={() => setResourceTab("SANITATION")}
@@ -66,13 +70,57 @@ export default function ResourcesPage() {
             }`}
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>Sanitation (4)</span>
+            <span>Sanitation ({state.sanitationCrews.length})</span>
           </button>
         </div>
       </div>
 
       {/* Critical Water Highlight Card */}
-      {resourceTab === "WATER" && (
+      {isLiveMode && (
+        <div className="card-base p-6 space-y-4 border-2 border-emerald-200 bg-emerald-50/40">
+          <div>
+            <h2 className="text-sm font-bold text-wari-textPrimary">Live Resource Optimization</h2>
+            <p className="text-xs text-wari-textMuted mt-1">
+              Recommendations are calculated from registered Dindis and live GPS. Demo Camp 6 data is hidden in Live Mode.
+            </p>
+          </div>
+
+          {topLiveCluster ? (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+              <div className="rounded-xl bg-white border border-wari-cardBorder p-4">
+                <span className="text-wari-textMuted block">Live Crowd</span>
+                <span className="text-xl font-black text-wari-textPrimary">{topLiveCluster.totalPilgrims.toLocaleString()}</span>
+                <p className="text-red-700 font-semibold mt-1">{topLiveCluster.occupancyPercent}% of 400 capacity</p>
+              </div>
+              <div className="rounded-xl bg-white border border-wari-cardBorder p-4">
+                <span className="text-wari-textMuted block">Nearest Halt</span>
+                <span className="font-bold text-wari-textPrimary">
+                  {topLiveCluster.nearestCamp ? topLiveCluster.nearestCamp.item.name : "No live halt registered"}
+                </span>
+              </div>
+              <div className="rounded-xl bg-white border border-wari-cardBorder p-4">
+                <span className="text-wari-textMuted block">Nearest Water</span>
+                <span className="font-bold text-wari-textPrimary">
+                  {topLiveCluster.nearestTanker ? `${topLiveCluster.nearestTanker.item.id} (${topLiveCluster.nearestTanker.distanceKm} km)` : "No live tanker registered"}
+                </span>
+              </div>
+              <div className="rounded-xl bg-white border border-wari-cardBorder p-4">
+                <span className="text-wari-textMuted block">Nearest Medical</span>
+                <span className="font-bold text-wari-textPrimary">
+                  {topLiveCluster.nearestMedical ? `${topLiveCluster.nearestMedical.item.name} (${topLiveCluster.nearestMedical.distanceKm} km)` : "No medical post registered"}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl bg-white border border-dashed border-wari-cardBorder p-6 text-center">
+              <p className="text-sm font-bold text-wari-textPrimary">No live Dindi crowd pressure yet</p>
+              <p className="text-xs text-wari-textMuted mt-1">Register a Dindi from the Dindi portal to calculate nearest camps, water, medical, and sanitation support.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {resourceTab === "WATER" && !isLiveMode && (
         <div
           className={`p-6 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all ${
             isMitigated
@@ -129,7 +177,7 @@ export default function ResourcesPage() {
       )}
 
       {/* Main Grid: Camps vs Fleet */}
-      {resourceTab === "WATER" && (
+      {resourceTab === "WATER" && !isLiveMode && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Camps Water Stock Table (7 Cols) */}
           <div className="lg:col-span-7 card-base p-6 space-y-4">
@@ -250,7 +298,7 @@ export default function ResourcesPage() {
       )}
 
       {/* Food & Prasad Tab */}
-      {resourceTab === "FOOD" && (
+      {resourceTab === "FOOD" && !isLiveMode && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {state.camps.map((c) => (
             <div
@@ -276,7 +324,7 @@ export default function ResourcesPage() {
       )}
 
       {/* Sanitation Tab */}
-      {resourceTab === "SANITATION" && (
+      {resourceTab === "SANITATION" && !isLiveMode && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {state.sanitationCrews.map((sc) => (
             <div

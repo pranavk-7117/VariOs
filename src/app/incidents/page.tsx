@@ -17,6 +17,7 @@ import {
 import { useSimulation } from "@/context/SimulationContext";
 import { PriorityGauge } from "@/components/common/PriorityGauge";
 import { DecisionFlowBar } from "@/components/dashboard/DecisionFlowBar";
+import { getLiveCrowdClusters } from "@/lib/live-ops";
 
 export default function IncidentsPage() {
   const {
@@ -32,6 +33,81 @@ export default function IncidentsPage() {
   const cp4 = state.checkpoints.find((c) => c.shortCode === "CP4");
   const camp6 = state.camps.find((c) => c.id === "CAMP-06");
   const dindi14 = state.dindis.find((d) => d.id === "DINDI-14");
+  const liveClusters = getLiveCrowdClusters(state);
+
+  if (!state.isSimulating) {
+    return (
+      <div className="space-y-6 animate-fadeIn">
+        <div className="card-base p-6">
+          <h1 className="text-xl font-bold text-wari-textPrimary">Live Incidents</h1>
+          <p className="text-sm text-wari-textSecond mt-1">
+            Only real leader registrations, GPS crowd aggregation, and field reports are shown in Live Mode.
+          </p>
+        </div>
+
+        {liveClusters.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {liveClusters.map((cluster) => (
+              <div key={cluster.id} className="card-base p-5 border-2 border-red-200 bg-red-50/40 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-bold text-red-700 uppercase">Live Crowd Pressure</span>
+                    <h2 className="text-lg font-bold text-wari-textPrimary">{cluster.name}</h2>
+                    <p className="text-xs text-wari-textMuted">
+                      GPS {cluster.lat.toFixed(4)}, {cluster.lng.toFixed(4)}
+                    </p>
+                  </div>
+                  <span className="badge-critical">{cluster.risk}</span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="bg-white rounded-xl border border-wari-cardBorder p-3">
+                    <span className="text-wari-textMuted block">People</span>
+                    <span className="font-black text-wari-textPrimary">{cluster.totalPilgrims.toLocaleString()}</span>
+                  </div>
+                  <div className="bg-white rounded-xl border border-wari-cardBorder p-3">
+                    <span className="text-wari-textMuted block">Capacity</span>
+                    <span className="font-black text-red-700">{cluster.occupancyPercent}%</span>
+                  </div>
+                  <div className="bg-white rounded-xl border border-wari-cardBorder p-3">
+                    <span className="text-wari-textMuted block">Overflow</span>
+                    <span className="font-black text-red-700">{cluster.overcrowdedBy.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-white border border-wari-cardBorder p-4 text-xs text-wari-textSecond space-y-1">
+                  <p><strong>Dindis together:</strong> {cluster.dindis.map((dindi) => `${dindi.name} (${dindi.pilgrimCount.toLocaleString()})`).join(", ")}</p>
+                  <p><strong>Nearest halt:</strong> {cluster.nearestCamp ? `${cluster.nearestCamp.item.name} (${cluster.nearestCamp.distanceKm} km)` : "No halt registered"}</p>
+                  <p><strong>Recommended action:</strong> Move overflow, stage water, and keep medical standby at the nearest verified facility.</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {state.alerts.length > 0 ? (
+          <div className="card-base p-5 space-y-3">
+            <h2 className="text-sm font-bold text-wari-textPrimary">Live Alert Feed</h2>
+            {state.alerts.map((alert) => (
+              <div key={alert.id} className="rounded-xl border border-wari-cardBorder bg-wari-pageBg p-4 text-xs">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-bold text-wari-textPrimary">{alert.title}</span>
+                  <span className={alert.severity === "CRITICAL" ? "badge-critical" : "badge-high"}>{alert.severity}</span>
+                </div>
+                <p className="text-wari-textSecond mt-1">{alert.cause}</p>
+                <p className="text-wari-orange font-semibold mt-2">{alert.recommendedAction}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="card-base p-8 text-center border-2 border-dashed border-wari-cardBorder">
+            <p className="text-sm font-bold text-wari-textPrimary">No live incidents yet</p>
+            <p className="text-xs text-wari-textMuted mt-1">Register Dindis or submit a leader quick action to create real alerts.</p>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fadeIn">

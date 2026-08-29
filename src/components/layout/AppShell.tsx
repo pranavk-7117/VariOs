@@ -30,13 +30,13 @@ export const AppShell: React.FC<{ children: ReactNode }> = ({ children }) => {
   }
 
   return (
-    <div className="flex h-screen bg-wari-pageBg text-wari-textPrimary overflow-hidden font-sans">
+    <div className="flex h-screen bg-wari-pageBg text-wari-textPrimary overflow-hidden font-sans wari-app-frame">
       <Sidebar />
 
       <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
         <Header />
 
-        <main className="flex-1 overflow-y-auto bg-wari-pageBg">
+        <main className="flex-1 overflow-y-auto wari-dashboard-bg">
           <div className="max-w-7xl mx-auto px-6 py-6 sm:px-8 sm:py-8 space-y-6 pb-12">
             {children}
           </div>

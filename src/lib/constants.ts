@@ -743,6 +743,7 @@ export const INITIAL_VOLUNTEERS: Volunteer[] = [
   {
     id: "VOL-101",
     name: "Aniket Deshmukh",
+    phone: "+91 98220 14892",
     skills: ["TRAFFIC", "CROWD_CONTROL", "MARATHI_HINDI"],
     locationName: "Dive Ghat Base CP3",
     lat: 18.441,
@@ -755,6 +756,7 @@ export const INITIAL_VOLUNTEERS: Volunteer[] = [
   {
     id: "VOL-102",
     name: "Pooja Kulkarni",
+    phone: "+91 98901 32410",
     skills: ["MEDICAL", "MARATHI_HINDI"],
     locationName: "Dive Ghat Apex Post",
     lat: 18.412,
@@ -767,6 +769,7 @@ export const INITIAL_VOLUNTEERS: Volunteer[] = [
   {
     id: "VOL-103",
     name: "Sachin Thorat",
+    phone: "+91 97633 89201",
     skills: ["TRAFFIC", "CROWD_CONTROL"],
     locationName: "Hadapsar Gadital CP2",
     lat: 18.5089,
@@ -779,6 +782,7 @@ export const INITIAL_VOLUNTEERS: Volunteer[] = [
   {
     id: "VOL-104",
     name: "Sneha Bhosale",
+    phone: "+91 94220 56712",
     skills: ["MEDICAL", "CROWD_CONTROL"],
     locationName: "Saswad North CP5",
     lat: 18.343,
@@ -791,6 +795,7 @@ export const INITIAL_VOLUNTEERS: Volunteer[] = [
   {
     id: "VOL-105",
     name: "Rahul Mane",
+    phone: "+91 98234 11980",
     skills: ["TRAFFIC", "LOGISTICS"],
     locationName: "Wadki Sector 2",
     lat: 18.43,
@@ -803,6 +808,7 @@ export const INITIAL_VOLUNTEERS: Volunteer[] = [
   {
     id: "VOL-106",
     name: "Meera Dhavale",
+    phone: "+91 98902 77451",
     skills: ["TRAFFIC", "MARATHI_HINDI"],
     locationName: "Dive Ghat Incline 4",
     lat: 18.418,
@@ -815,6 +821,7 @@ export const INITIAL_VOLUNTEERS: Volunteer[] = [
   {
     id: "VOL-107",
     name: "Tanaji Shinde",
+    phone: "+91 98229 44321",
     skills: ["CROWD_CONTROL", "LOGISTICS"],
     locationName: "Saswad Palkhi Maidan",
     lat: 18.344,
@@ -827,6 +834,7 @@ export const INITIAL_VOLUNTEERS: Volunteer[] = [
   {
     id: "VOL-108",
     name: "Aarti Salunkhe",
+    phone: "+91 97645 88902",
     skills: ["MEDICAL", "MARATHI_HINDI"],
     locationName: "Jejuri Foothills",
     lat: 18.278,
@@ -839,6 +847,7 @@ export const INITIAL_VOLUNTEERS: Volunteer[] = [
   {
     id: "VOL-109",
     name: "Ganesh Mohite",
+    phone: "+91 98221 66734",
     skills: ["CROWD_CONTROL", "TRAFFIC"],
     locationName: "Dive Ghat Base",
     lat: 18.44,
@@ -851,6 +860,7 @@ export const INITIAL_VOLUNTEERS: Volunteer[] = [
   {
     id: "VOL-110",
     name: "Priyanka Chavan",
+    phone: "+91 98908 22190",
     skills: ["MEDICAL", "CROWD_CONTROL", "LOGISTICS"],
     locationName: "Dive Ghat Apex Checkpoint",
     lat: 18.413,
@@ -1101,7 +1111,7 @@ export const INITIAL_EVENTS: OperationalEvent[] = [
   },
 ];
 
-export const INITIAL_SIMULATION_STATE: SimulationState = {
+export const DEMO_INITIAL_STATE: SimulationState = {
   isSimulating: true,
   simulationSpeed: 1,
   currentClock: "10:42 AM",
@@ -1120,6 +1130,7 @@ export const INITIAL_SIMULATION_STATE: SimulationState = {
   volunteers: INITIAL_VOLUNTEERS,
   medicalStations: INITIAL_MEDICAL_STATIONS,
   sanitationCrews: INITIAL_SANITATION_CREWS,
+  volunteerTasks: [],
   alerts: INITIAL_ALERTS,
   events: INITIAL_EVENTS,
   activeIncidentId: "INC-402",
@@ -1129,3 +1140,170 @@ export const INITIAL_SIMULATION_STATE: SimulationState = {
   beforeAfterSummary: null,
 };
 
+// Live Real Mode starts completely empty — only real user-generated data fills it
+export const LIVE_SUPPORT_CAMPS: Camp[] = [
+  {
+    id: "LIVE-CAMP-MMCOE",
+    name: "MMCOE Main Ground Rest Camp",
+    capacity: 400,
+    currentOccupancy: 0,
+    occupancyPercent: 0,
+    waterStockPercent: 78,
+    waterBurnRateLitersPerMin: 12,
+    minutesToWaterDepletion: 180,
+    assignedTankers: ["LIVE-WATER-MMCOE"],
+    foodStockPercent: 72,
+    shelterStatus: "STABLE",
+    lat: 18.4905,
+    lng: 73.8099,
+    status: "NORMAL",
+  },
+  ...INITIAL_CAMPS,
+];
+
+export const LIVE_SUPPORT_TANKERS: WaterTanker[] = [
+  {
+    id: "LIVE-WATER-MMCOE",
+    capacityLiters: 2000,
+    status: "AVAILABLE",
+    currentHub: "MMCOE Water Point",
+    distanceKm: 0,
+    etaMinutes: 2,
+    driverName: "MMCOE Campus Water Desk",
+    lat: 18.4907,
+    lng: 73.8102,
+  },
+  ...INITIAL_TANKERS,
+];
+
+export const LIVE_SUPPORT_VOLUNTEERS: Volunteer[] = [
+  {
+    id: "LIVE-VOL-MMCOE-01",
+    assignedCampId: "LIVE-CAMP-MMCOE",
+    name: "Aarav Patil",
+    phone: "+91 90000 10001",
+    skills: ["CROWD_CONTROL", "MARATHI_HINDI"],
+    locationName: "MMCOE Main Gate",
+    lat: 18.4907,
+    lng: 73.8097,
+    batteryPercent: 91,
+    status: "AVAILABLE",
+    avatarColor: "#10B981",
+  },
+  {
+    id: "LIVE-VOL-MMCOE-02",
+    assignedCampId: "LIVE-CAMP-MMCOE",
+    name: "Sanika Jadhav",
+    phone: "+91 90000 10002",
+    skills: ["MEDICAL", "MARATHI_HINDI"],
+    locationName: "MMCOE First Aid Desk",
+    lat: 18.4901,
+    lng: 73.8104,
+    batteryPercent: 88,
+    status: "AVAILABLE",
+    avatarColor: "#E85A1C",
+  },
+  {
+    id: "LIVE-VOL-MMCOE-03",
+    assignedCampId: "LIVE-CAMP-MMCOE",
+    name: "Rohan Shinde",
+    phone: "+91 90000 10003",
+    skills: ["TRAFFIC", "LOGISTICS"],
+    locationName: "MMCOE Parking Bay",
+    lat: 18.4899,
+    lng: 73.8093,
+    batteryPercent: 84,
+    status: "AVAILABLE",
+    avatarColor: "#3B82F6",
+  },
+  ...INITIAL_VOLUNTEERS,
+];
+
+export const LIVE_SUPPORT_MEDICAL_STATIONS: MedicalStation[] = [
+  {
+    id: "LIVE-MS-MMCOE",
+    name: "MMCOE First Aid & Triage Desk",
+    capacityBeds: 8,
+    occupiedBeds: 0,
+    occupancyPercent: 0,
+    status: "NORMAL",
+    doctorCount: 1,
+    availableAmbulances: 1,
+    heatStrokeKits: 20,
+    lat: 18.4902,
+    lng: 73.8101,
+  },
+  {
+    id: "LIVE-MS-DEENANATH",
+    name: "Deenanath Mangeshkar Hospital",
+    capacityBeds: 80,
+    occupiedBeds: 36,
+    occupancyPercent: 45,
+    status: "NORMAL",
+    doctorCount: 18,
+    availableAmbulances: 4,
+    heatStrokeKits: 60,
+    lat: 18.5013,
+    lng: 73.8322,
+  },
+  {
+    id: "LIVE-MS-SASSOON",
+    name: "Sassoon General Hospital",
+    capacityBeds: 120,
+    occupiedBeds: 58,
+    occupancyPercent: 48,
+    status: "NORMAL",
+    doctorCount: 24,
+    availableAmbulances: 7,
+    heatStrokeKits: 100,
+    lat: 18.5286,
+    lng: 73.8744,
+  },
+  ...INITIAL_MEDICAL_STATIONS,
+];
+
+export const LIVE_SUPPORT_SANITATION_CREWS: SanitationCrew[] = [
+  {
+    id: "LIVE-SC-MMCOE",
+    name: "MMCOE Sanitation Support Crew",
+    status: "AVAILABLE",
+    leadName: "Campus Facility Desk",
+    activeToiletsCleaned: 12,
+    zone: "MMCOE Campus",
+    lat: 18.4903,
+    lng: 73.8103,
+  },
+  ...INITIAL_SANITATION_CREWS,
+];
+
+export const LIVE_INITIAL_STATE: SimulationState = {
+  isSimulating: false,
+  simulationSpeed: 1,
+  currentClock: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }),
+  totalPilgrims: 0,
+  routeUtilization: 0,
+  weatherCondition: {
+    rainfallMmH: 0,
+    temperatureC: 28,
+    heatIndex: "MODERATE",
+    activeRainSector: "—",
+  },
+  checkpoints: INITIAL_CHECKPOINTS,
+  dindis: [],
+  alerts: [],          // empty — only real user-reported alerts
+  events: [],          // empty — clean audit log
+  camps: LIVE_SUPPORT_CAMPS,
+  tankers: LIVE_SUPPORT_TANKERS,
+  volunteers: LIVE_SUPPORT_VOLUNTEERS,
+  medicalStations: LIVE_SUPPORT_MEDICAL_STATIONS,
+  sanitationCrews: LIVE_SUPPORT_SANITATION_CREWS,
+  volunteerTasks: [],
+  activeIncidentId: null,
+  decisionStage: "DETECTED",
+  isMitigated: false,
+  showBeforeAfterModal: false,
+  beforeAfterSummary: null,
+};
+
+// Backward-compat alias
+export const INITIAL_SIMULATION_STATE = LIVE_INITIAL_STATE;

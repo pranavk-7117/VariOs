@@ -11,8 +11,11 @@ import {
   Sparkles,
 } from "lucide-react";
 import { SCENARIO_PRESETS, generateCounterfactualData } from "@/lib/counterfactual";
+import { useSimulation } from "@/context/SimulationContext";
+import { getLiveCrowdClusters } from "@/lib/live-ops";
 
 export default function SimulatorPage() {
+  const { state } = useSimulation();
   const [rainMmH, setRainMmH] = useState(18);
   const [pilgrimSurgePercent, setPilgrimSurgePercent] = useState(25);
   const [dindiSpeedKmH, setDindiSpeedKmH] = useState(3.2);
@@ -23,6 +26,16 @@ export default function SimulatorPage() {
     rainMmH,
     1 + pilgrimSurgePercent / 100,
     dindiSpeedKmH
+  );
+  const liveClusters = getLiveCrowdClusters(state);
+  const liveCluster = liveClusters[0];
+  const liveBasePeople = liveCluster?.totalPilgrims ?? state.totalPilgrims;
+  const liveCapacity = liveCluster?.capacity ?? 400;
+  const projectedPeople = Math.round(liveBasePeople * (1 + pilgrimSurgePercent / 100));
+  const projectedOccupancy = liveCapacity > 0 ? Math.round((projectedPeople / liveCapacity) * 100) : 0;
+  const activeResponseOccupancy = Math.max(
+    0,
+    Math.round(projectedOccupancy - 30 - Math.max(0, (waterFactor - 1) * 12) - Math.max(0, dindiSpeedKmH - 3.6) * 6)
   );
 
   const applyPreset = (presetId: string) => {
@@ -71,6 +84,7 @@ export default function SimulatorPage() {
       </div>
 
       {/* Preset Scenarios Chips */}
+      {state.isSimulating ? (
       <div className="card-base p-6 space-y-3">
         <span className="text-xs font-bold text-wari-textMuted uppercase tracking-wider block">
           Preset Operational Scenarios:
@@ -96,6 +110,39 @@ export default function SimulatorPage() {
           ))}
         </div>
       </div>
+      ) : (
+        <div className="card-base p-6 space-y-4 border-2 border-emerald-200 bg-emerald-50/40">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-wari-textPrimary">Live MMCOE What-If Baseline</h2>
+              <p className="text-xs text-wari-textSecond mt-1">
+                Uses registered Dindi GPS and leader-entered counts. Add Dindi B or change volume to see overcrowding projections.
+              </p>
+            </div>
+            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white border border-emerald-200 text-emerald-700">
+              REAL DATA MODE
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+            <div className="bg-white rounded-xl border border-emerald-200 p-3">
+              <span className="text-wari-textMuted block">Current live people</span>
+              <strong className="text-lg text-wari-textPrimary">{liveBasePeople.toLocaleString()}</strong>
+            </div>
+            <div className="bg-white rounded-xl border border-emerald-200 p-3">
+              <span className="text-wari-textMuted block">Safe local capacity</span>
+              <strong className="text-lg text-wari-textPrimary">{liveCapacity.toLocaleString()}</strong>
+            </div>
+            <div className="bg-white rounded-xl border border-emerald-200 p-3">
+              <span className="text-wari-textMuted block">Projected occupancy</span>
+              <strong className={projectedOccupancy > 100 ? "text-lg text-red-700" : "text-lg text-emerald-700"}>{projectedOccupancy}%</strong>
+            </div>
+            <div className="bg-white rounded-xl border border-emerald-200 p-3">
+              <span className="text-wari-textMuted block">Nearest halt</span>
+              <strong className="text-sm text-wari-textPrimary">{liveCluster?.nearestCamp?.item.name ?? "Register a Dindi"}</strong>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Interactive Controls & Parameters Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 card-base p-6">
@@ -237,7 +284,11 @@ export default function SimulatorPage() {
             </div>
 
             <div className="space-y-3 text-xs">
-              {counterfactualResults.map((r, idx) => (
+              {(state.isSimulating ? counterfactualResults : [
+                { metricName: "MMCOE Crowd Load", noActionValue: `${projectedPeople.toLocaleString()} people (${projectedOccupancy}%)` },
+                { metricName: "Capacity Breach", noActionValue: projectedOccupancy > 100 ? `${projectedPeople - liveCapacity} over safe capacity` : "No breach" },
+                { metricName: "Medical/Water Response", noActionValue: projectedOccupancy > 100 ? "Delayed triage, manual calls" : "Routine watch" },
+              ]).map((r, idx) => (
                 <div
                   key={idx}
                   className="p-3.5 rounded-xl bg-white border border-red-200 flex items-center justify-between shadow-sm"
@@ -263,7 +314,11 @@ export default function SimulatorPage() {
             </div>
 
             <div className="space-y-3 text-xs">
-              {counterfactualResults.map((r, idx) => (
+              {(state.isSimulating ? counterfactualResults : [
+                { metricName: "MMCOE Crowd Load", wariosValue: `${Math.round((activeResponseOccupancy / 100) * liveCapacity).toLocaleString()} managed load`, delta: `-${Math.max(0, projectedOccupancy - activeResponseOccupancy)}% pressure` },
+                { metricName: "Capacity Breach", wariosValue: activeResponseOccupancy > 100 ? "Overflow routed to nearest halt" : "Within managed threshold", delta: liveCluster?.nearestCamp?.item.name ?? "Awaiting Dindi" },
+                { metricName: "Medical/Water Response", wariosValue: "Nearest teams assigned from GPS", delta: liveCluster?.nearestMedical?.item.name ?? "Awaiting GPS" },
+              ]).map((r, idx) => (
                 <div
                   key={idx}
                   className="p-3.5 rounded-xl bg-white border border-emerald-200 flex items-center justify-between shadow-sm"

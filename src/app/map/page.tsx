@@ -26,7 +26,7 @@ export default function MapPage() {
   const { state } = useSimulation();
   const { t } = useLanguage();
 
-  const criticalCPs = state.checkpoints.filter((cp) => cp.risk === "CRITICAL");
+  const criticalCPs = state.isSimulating ? state.checkpoints.filter((cp) => cp.risk === "CRITICAL") : [];
   const highCPs     = state.checkpoints.filter((cp) => cp.risk === "HIGH");
 
   return (
@@ -59,7 +59,7 @@ export default function MapPage() {
           <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
           <p className="text-sm text-red-700 font-medium">
             <strong>{criticalCPs.map((c) => c.shortCode).join(", ")}</strong> —{" "}
-            Critical density. Click markers on map for real-time stats and bypass options.
+            Demo archive critical density. Click markers on map for historical stats and bypass options.
           </p>
         </div>
       )}
@@ -70,7 +70,7 @@ export default function MapPage() {
       </div>
 
       {/* Checkpoint status strip */}
-      <div>
+      {state.isSimulating && <div>
         <h2 className="section-label">Checkpoint Status</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
           {state.checkpoints.map((cp) => {
@@ -92,7 +92,7 @@ export default function MapPage() {
             );
           })}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

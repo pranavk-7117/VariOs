@@ -18,6 +18,7 @@ import { PalkhiScheduleTimeline } from "@/components/dindis/PalkhiScheduleTimeli
 import { DindiProcessionFormation } from "@/components/dindis/DindiProcessionFormation";
 import { DindiCodeLookupCard } from "@/components/dindis/DindiCodeLookupCard";
 import DindiLeaderRegisterCard from "@/components/dindis/DindiLeaderRegisterCard";
+import { DindiLeaderNearbyView } from "@/components/dindis/DindiLeaderNearbyView";
 import { Dindi } from "@/lib/types";
 
 export default function DindisPage() {
@@ -34,15 +35,20 @@ export default function DindisPage() {
       {/* Header */}
       <div className="card-base p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-100 border border-blue-200 text-blue-600 flex items-center justify-center shadow-sm">
-            <Compass className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl bg-amber-100 border border-amber-200 text-amber-600 flex items-center justify-center shadow-sm text-2xl">
+            🟠
           </div>
           <div>
-            <h1 className="text-xl font-bold text-wari-textPrimary tracking-tight">
-              Dindi Sync & Live GPS Tracking
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-wari-textPrimary tracking-tight">
+                Dindi Pramukh & Leader Dashboard
+              </h1>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-orange-100 text-orange-800 border border-orange-300">
+                PRAMUKH PORTAL
+              </span>
+            </div>
             <p className="text-sm text-wari-textSecond mt-0.5">
-              Live device geolocation beacon, real-time pace monitoring, and Palkhi ETA calculations
+              Register Dindi, broadcast live phone GPS, view nearby facilities, and contact ground volunteers
             </p>
           </div>
         </div>
@@ -60,6 +66,9 @@ export default function DindisPage() {
 
       {/* Dindi Leader Self-Registration & Live GPS Broadcast */}
       <DindiLeaderRegisterCard />
+
+      {/* Nearby Facilities & Nearby Volunteers with Direct Call Buttons */}
+      <DindiLeaderNearbyView />
 
       {/* Dindi Passcode Access & Real-Time Locator */}
       <DindiCodeLookupCard />

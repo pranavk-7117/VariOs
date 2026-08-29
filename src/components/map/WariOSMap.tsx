@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useSimulation } from "@/context/SimulationContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useLiveGps } from "@/context/LiveGpsContext";
+import { getLiveCrowdClusters } from "@/lib/live-ops";
 import {
   Crosshair,
   Radio,
@@ -57,6 +58,9 @@ const WariOSMapInner: React.FC<WariOSMapProps> = ({
   const mapRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const liveMarkerRef = useRef<any>(null);
+  const liveDindiLayerRef = useRef<any>(null);
+  const liveSupportLayerRef = useRef<any>(null);
+  const hasAutoFitLiveDindisRef = useRef(false);
   const simulatedPalkhiMarkerRef = useRef<any>(null);
   const accuracyCircleRef = useRef<any>(null);
   const LRef = useRef<any>(null);
@@ -72,15 +76,27 @@ const WariOSMapInner: React.FC<WariOSMapProps> = ({
   const [marchStep, setMarchStep] = useState<number>(0);
   const [currentSectorText, setCurrentSectorText] = useState<string>("Alandi Temple ➔ Vishrantwadi");
   const [routeProgressPercent, setRouteProgressPercent] = useState<number>(0);
+  const liveClusters = getLiveCrowdClusters(state);
+  const primaryLiveCluster = liveClusters[0];
 
   const totalStepsPerSegment = 80;
 
   // Initialize Map
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    let isCancelled = false;
 
     import("leaflet").then((L) => {
+      if (isCancelled || !containerRef.current) return;
       LRef.current = L;
+
+      // Ensure container is not already initialized
+      if ((containerRef.current as any)._leaflet_id) {
+        if (mapRef.current) {
+          mapRef.current.remove();
+          mapRef.current = null;
+        }
+        delete (containerRef.current as any)._leaflet_id;
+      }
 
       const iconDefault = L.icon({
         iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -93,7 +109,7 @@ const WariOSMapInner: React.FC<WariOSMapProps> = ({
       });
       L.Marker.prototype.options.icon = iconDefault;
 
-      const map = L.map(containerRef.current!, {
+      const map = L.map(containerRef.current, {
         center: [18.15, 74.5],
         zoom,
         zoomControl: true,
@@ -177,7 +193,7 @@ const WariOSMapInner: React.FC<WariOSMapProps> = ({
 
       // Checkpoints layer
       const checkpointLayer = L.layerGroup();
-      state.checkpoints.forEach((cp) => {
+      if (state.isSimulating) state.checkpoints.forEach((cp) => {
         const cpCoords = CHECKPOINT_COORDS[cp.shortCode];
         if (!cpCoords) return;
 
@@ -222,15 +238,11 @@ const WariOSMapInner: React.FC<WariOSMapProps> = ({
 
         checkpointLayer.addLayer(marker);
       });
-      checkpointLayer.addTo(map);
+      if (state.isSimulating) checkpointLayer.addTo(map);
 
       // Camps layer
       const campLayer = L.layerGroup();
-      state.camps.forEach((camp, i) => {
-        const idx = i % WARI_ROUTE_WAYPOINTS.length;
-        const cCoords = WARI_ROUTE_WAYPOINTS[idx];
-        const offset: [number, number] = [cCoords[0] + 0.015 * (i % 3 - 1), cCoords[1] + 0.02];
-
+      state.camps.forEach((camp) => {
         const icon = L.divIcon({
           className: "",
           html: `<div style="background:#3B82F6;border:2px solid white;border-radius:6px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;box-shadow:0 2px 6px rgba(0,0,0,0.2)">⛺</div>`,
@@ -239,7 +251,7 @@ const WariOSMapInner: React.FC<WariOSMapProps> = ({
           popupAnchor: [0, -14],
         });
 
-        L.marker(offset, { icon })
+        L.marker([camp.lat, camp.lng], { icon })
           .bindPopup(`
             <div style="font-family:system-ui,sans-serif;padding:4px;min-width:160px">
               <div style="font-weight:700;font-size:13px;color:#1C1529;margin-bottom:4px">${camp.name}</div>
@@ -249,14 +261,11 @@ const WariOSMapInner: React.FC<WariOSMapProps> = ({
           `, { maxWidth: 200 })
           .addTo(campLayer);
       });
+      campLayer.addTo(map);
 
       // Medical station markers
       const medLayer = L.layerGroup();
-      state.medicalStations.forEach((ms, i) => {
-        const idx = Math.min(i + 1, WARI_ROUTE_WAYPOINTS.length - 1);
-        const mCoords = WARI_ROUTE_WAYPOINTS[idx];
-        const offset: [number, number] = [mCoords[0] - 0.02 * (i % 2 + 1), mCoords[1] - 0.02];
-
+      state.medicalStations.forEach((ms) => {
         const icon = L.divIcon({
           className: "",
           html: `<div style="background:#10B981;border:2px solid white;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;box-shadow:0 2px 6px rgba(0,0,0,0.2)">🏥</div>`,
@@ -265,7 +274,7 @@ const WariOSMapInner: React.FC<WariOSMapProps> = ({
           popupAnchor: [0, -14],
         });
 
-        L.marker(offset, { icon })
+        L.marker([ms.lat, ms.lng], { icon })
           .bindPopup(`
             <div style="font-family:system-ui,sans-serif;padding:4px;min-width:160px">
               <div style="font-weight:700;font-size:13px;color:#1C1529;margin-bottom:4px">${ms.name}</div>
@@ -275,6 +284,7 @@ const WariOSMapInner: React.FC<WariOSMapProps> = ({
           `, { maxWidth: 200 })
           .addTo(medLayer);
       });
+      medLayer.addTo(map);
 
       // 2026 Ringans & Halts Layer
       const ringanHaltLayer = L.layerGroup();
@@ -344,10 +354,12 @@ const WariOSMapInner: React.FC<WariOSMapProps> = ({
         popupAnchor: [0, -18],
       });
 
+      if (state.isSimulating) {
       const simMarker = L.marker(WARI_ROUTE_WAYPOINTS[0], { icon: simulatedIcon, zIndexOffset: 2000 })
         .bindPopup("<b>🚩 Sant Dnyaneshwar Maharaj Palkhi Chariot (Rath)</b><br>Live Route March Simulation Active");
       simMarker.addTo(map);
       simulatedPalkhiMarkerRef.current = simMarker;
+      }
 
       // Layer controls
       if (showLayerControl) {
@@ -365,13 +377,114 @@ const WariOSMapInner: React.FC<WariOSMapProps> = ({
     });
 
     return () => {
+      isCancelled = true;
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
       }
+      if (containerRef.current && (containerRef.current as any)._leaflet_id) {
+        delete (containerRef.current as any)._leaflet_id;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!mapRef.current || !LRef.current) return;
+    const L = LRef.current;
+    const map = mapRef.current;
+
+    if (liveDindiLayerRef.current) {
+      map.removeLayer(liveDindiLayerRef.current);
+      liveDindiLayerRef.current = null;
+    }
+
+    const liveDindis = state.dindis.filter((dindi) => dindi.isCustomRegistered);
+    if (liveDindis.length === 0) return;
+
+    const layer = L.layerGroup();
+    liveDindis.forEach((dindi) => {
+      const icon = L.divIcon({
+        className: "",
+        html: `
+          <div style="position:relative;width:38px;height:38px;display:flex;align-items:center;justify-content:center;">
+            <div style="position:absolute;inset:0;border-radius:50%;background:${dindi.routeColor};opacity:0.35;animation:ping 1.4s cubic-bezier(0,0,0.2,1) infinite;"></div>
+            <div style="position:absolute;width:30px;height:30px;border-radius:50%;background:${dindi.routeColor};border:3px solid white;box-shadow:0 0 14px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:800;">
+              D
+            </div>
+          </div>
+        `,
+        iconSize: [38, 38],
+        iconAnchor: [19, 19],
+        popupAnchor: [0, -20],
+      });
+
+      L.marker([dindi.lat, dindi.lng], { icon, zIndexOffset: 2200 })
+        .bindPopup(`
+          <div style="font-family:system-ui,sans-serif;padding:6px;min-width:210px">
+            <div style="font-weight:800;font-size:14px;color:#1C1529">${dindi.name}</div>
+            <div style="font-size:12px;color:#6A6070;margin-top:3px">Leader: <strong>${dindi.leader}</strong></div>
+            <div style="font-size:12px;color:#6A6070">Live count: <strong>${dindi.pilgrimCount.toLocaleString()}</strong></div>
+            <div style="font-size:12px;color:#6A6070">Pace: <strong>${dindi.currentPaceKmH} km/h</strong></div>
+            <div style="font-size:11px;color:#10B981;margin-top:4px;font-weight:700">Real leader-registered GPS</div>
+          </div>
+        `)
+        .addTo(layer);
+    });
+
+    layer.addTo(map);
+    liveDindiLayerRef.current = layer;
+
+    if (!state.isSimulating && !hasAutoFitLiveDindisRef.current) {
+      const bounds = L.latLngBounds(liveDindis.map((dindi) => [dindi.lat, dindi.lng]));
+      map.fitBounds(bounds.pad(0.5), { maxZoom: 15, padding: [40, 40] });
+      hasAutoFitLiveDindisRef.current = true;
+    }
+  }, [state.dindis, state.isSimulating]);
+
+  useEffect(() => {
+    if (!mapRef.current || !LRef.current) return;
+    const L = LRef.current;
+    const map = mapRef.current;
+
+    if (liveSupportLayerRef.current) {
+      map.removeLayer(liveSupportLayerRef.current);
+      liveSupportLayerRef.current = null;
+    }
+
+    if (state.isSimulating) return;
+
+    const layer = L.layerGroup();
+    const makeIcon = (label: string, color: string, shape: "round" | "square" = "round") =>
+      L.divIcon({
+        className: "",
+        html: `<div style="background:${color};border:2px solid white;border-radius:${shape === "round" ? "50%" : "7px"};width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:800;box-shadow:0 2px 8px rgba(0,0,0,0.25)">${label}</div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -14],
+      });
+
+    state.tankers.forEach((tanker) => {
+      L.marker([tanker.lat, tanker.lng], { icon: makeIcon("W", "#2563EB", "square") })
+        .bindPopup(`<strong>${tanker.id}</strong><br>${tanker.currentHub}<br>${tanker.capacityLiters.toLocaleString()}L | ${tanker.status}`)
+        .addTo(layer);
+    });
+
+    state.volunteers.forEach((volunteer) => {
+      L.marker([volunteer.lat, volunteer.lng], { icon: makeIcon("V", "#7C3AED") })
+        .bindPopup(`<strong>${volunteer.name}</strong><br>${volunteer.locationName}<br>${volunteer.phone ?? "No phone"}<br>${volunteer.skills.join(", ")}`)
+        .addTo(layer);
+    });
+
+    state.sanitationCrews.forEach((crew) => {
+      L.marker([crew.lat, crew.lng], { icon: makeIcon("S", "#0F766E", "square") })
+        .bindPopup(`<strong>${crew.name}</strong><br>${crew.zone}<br>${crew.status}`)
+        .addTo(layer);
+    });
+
+    layer.addTo(map);
+    liveSupportLayerRef.current = layer;
+  }, [state.isSimulating, state.tankers, state.volunteers, state.sanitationCrews]);
 
   // March Simulation Interpolation Interval Engine
   useEffect(() => {
@@ -598,6 +711,35 @@ const WariOSMapInner: React.FC<WariOSMapProps> = ({
             >
               <Navigation className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {!state.isSimulating && primaryLiveCluster && (
+        <div className="absolute top-4 left-4 z-[400] bg-white/95 backdrop-blur border border-wari-cardBorder rounded-2xl p-3.5 shadow-lg max-w-[300px] space-y-2 text-xs animate-fadeIn">
+          <div className="flex items-center justify-between gap-3 pb-2 border-b border-wari-cardBorder">
+            <span className="font-bold text-sm text-wari-textPrimary">Live MMCOE Ops</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              primaryLiveCluster.overcrowdedBy > 0 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-800"
+            }`}>
+              {primaryLiveCluster.risk}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-wari-pageBg rounded-lg p-2 border border-wari-cardBorder">
+              <span className="block text-wari-textMuted">People</span>
+              <strong>{primaryLiveCluster.totalPilgrims.toLocaleString()} / {primaryLiveCluster.capacity.toLocaleString()}</strong>
+            </div>
+            <div className="bg-wari-pageBg rounded-lg p-2 border border-wari-cardBorder">
+              <span className="block text-wari-textMuted">Occupancy</span>
+              <strong>{primaryLiveCluster.occupancyPercent}%</strong>
+            </div>
+          </div>
+          <div className="space-y-1 text-wari-textSecond">
+            <div><strong>Next halt:</strong> {primaryLiveCluster.nearestCamp?.item.name ?? "Assign halt"}</div>
+            <div><strong>Medical:</strong> {primaryLiveCluster.nearestMedical?.item.name ?? "Assign post"}</div>
+            <div><strong>Water:</strong> {primaryLiveCluster.nearestTanker?.item.currentHub ?? "Assign tanker"}</div>
+            <div><strong>Volunteers:</strong> {primaryLiveCluster.nearestVolunteers.map((v) => v.item.name).join(", ") || "Assign team"}</div>
           </div>
         </div>
       )}

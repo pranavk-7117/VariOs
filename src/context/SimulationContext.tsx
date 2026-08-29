@@ -503,54 +503,88 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
       const nowId = Date.now();
 
       setState((prev) => {
-        const liveClusters = getLiveCrowdClusters(prev);
-        const topCluster = liveClusters[0];
-        const nearestCamp = topCluster?.nearestCamp;
-        const nearestTanker = topCluster?.nearestTanker;
-        const nearestMedical = topCluster?.nearestMedical;
+        // Parse GPS from details if available (e.g. "Lat 18.4905, Lng 73.8099")
+        let lat = 18.5138;
+        let lng = 73.8589;
+        const latMatch = details.match(/Lat\s*([0-9.]+)/i);
+        const lngMatch = details.match(/Lng\s*([0-9.]+)/i);
+        if (latMatch && lngMatch) {
+          lat = parseFloat(latMatch[1]);
+          lng = parseFloat(lngMatch[1]);
+        } else {
+          const matchingDindi = prev.dindis.find((d) => details.includes(d.name) || (d.passcode && details.includes(d.passcode)));
+          if (matchingDindi) {
+            lat = matchingDindi.lat;
+            lng = matchingDindi.lng;
+          }
+        }
 
-        // Find nearest available food supply unit
+        // Find closest camp to this specific request's GPS
+        const nearestCamp = prev.camps
+          .map((c) => ({ item: c, distKm: getDistanceKm(lat, lng, c.lat, c.lng) }))
+          .sort((a, b) => a.distKm - b.distKm)[0];
+
+        const campName = nearestCamp?.item.name ?? "Corridor Sector";
+
+        // Find nearest available water tanker to this request
+        const nearestTanker = prev.tankers
+          .filter((t) => t.status === "AVAILABLE")
+          .map((t) => ({ item: t, distKm: getDistanceKm(lat, lng, t.lat, t.lng) }))
+          .sort((a, b) => a.distKm - b.distKm)[0] ??
+          prev.tankers.map((t) => ({ item: t, distKm: getDistanceKm(lat, lng, t.lat, t.lng) })).sort((a, b) => a.distKm - b.distKm)[0];
+
+        // Find nearest available food supply unit to this request
         const nearestFood = prev.foodSupplies
           ?.filter((f) => f.status === "AVAILABLE")
-          .map((f) => ({ item: f, distKm: getDistanceKm(nearestCamp?.item.lat ?? 18.5138, nearestCamp?.item.lng ?? 73.8589, f.lat, f.lng) }))
+          .map((f) => ({ item: f, distKm: getDistanceKm(lat, lng, f.lat, f.lng) }))
+          .sort((a, b) => a.distKm - b.distKm)[0] ??
+          prev.foodSupplies?.map((f) => ({ item: f, distKm: getDistanceKm(lat, lng, f.lat, f.lng) })).sort((a, b) => a.distKm - b.distKm)[0];
+
+        // Find nearest medical station / hospital
+        const nearestMedical = prev.medicalStations
+          .map((m) => ({ item: m, distKm: getDistanceKm(lat, lng, m.lat, m.lng) }))
           .sort((a, b) => a.distKm - b.distKm)[0];
 
         // Find nearest available sanitation crew
         const nearestSanitation = prev.sanitationCrews
           ?.filter((s) => s.status === "AVAILABLE")
-          .map((s) => ({ item: s, distKm: getDistanceKm(nearestCamp?.item.lat ?? 18.5138, nearestCamp?.item.lng ?? 73.8589, s.lat, s.lng) }))
-          .sort((a, b) => a.distKm - b.distKm)[0];
+          .map((s) => ({ item: s, distKm: getDistanceKm(lat, lng, s.lat, s.lng) }))
+          .sort((a, b) => a.distKm - b.distKm)[0] ??
+          prev.sanitationCrews.map((s) => ({ item: s, distKm: getDistanceKm(lat, lng, s.lat, s.lng) })).sort((a, b) => a.distKm - b.distKm)[0];
 
+        // Find closest volunteer to this location
         const assignedVolunteer =
-          topCluster?.nearestVolunteers[0] ??
           prev.volunteers
-            .filter((v) => v.status === "AVAILABLE")
-            .map((volunteer) => ({ item: volunteer, distKm: getDistanceKm(18.5138, 73.8589, volunteer.lat, volunteer.lng) }))
-            .sort((a, b) => a.distKm - b.distKm)[0];
+            .filter((v) => v.assignedCampId === nearestCamp?.item.id || v.status === "AVAILABLE")
+            .map((v) => ({ item: v, distKm: getDistanceKm(lat, lng, v.lat, v.lng) }))
+            .sort((a, b) => a.distKm - b.distKm)[0] ??
+          prev.volunteers.map((v) => ({ item: v, distKm: getDistanceKm(lat, lng, v.lat, v.lng) })).sort((a, b) => a.distKm - b.distKm)[0];
 
         const etaMinutes = type === "WATER"
-          ? (nearestTanker?.distanceKm ? Math.max(5, Math.round((nearestTanker.distanceKm / 25) * 60)) : 15)
+          ? (nearestTanker?.distKm ? Math.max(3, Math.round((nearestTanker.distKm / 25) * 60)) : 12)
           : type === "FOOD"
-          ? (nearestFood?.distKm ? Math.max(5, Math.round((nearestFood.distKm / 30) * 60)) : 12)
+          ? (nearestFood?.distKm ? Math.max(4, Math.round((nearestFood.distKm / 30) * 60)) : 15)
+          : type === "MEDICAL"
+          ? (nearestMedical?.distKm ? Math.max(2, Math.round((nearestMedical.distKm / 40) * 60)) : 8)
           : type === "SANITATION"
-          ? (nearestSanitation?.distKm ? Math.max(5, Math.round((nearestSanitation.distKm / 20) * 60)) : 10)
-          : 15;
+          ? (nearestSanitation?.distKm ? Math.max(3, Math.round((nearestSanitation.distKm / 20) * 60)) : 10)
+          : 10;
 
         const resourceDescription =
           type === "WATER"
-            ? `Dispatch water tanker ${nearestTanker?.item.id ?? "nearest tanker"} from ${nearestTanker?.item.currentHub ?? "staging hub"} to ${nearestCamp?.item.name ?? "Dindi position"}.`
-            : type === "MEDICAL"
-            ? `Alert medical station ${nearestMedical?.item.name ?? "Deenanath Mangeshkar"} and mobilize field doctor.`
+            ? `Dispatch Water Tanker ${nearestTanker?.item.id ?? "LIVE-WATER-01"} (${nearestTanker?.item.capacityLiters.toLocaleString()}L) from ${nearestTanker?.item.currentHub ?? "Hub"} (${nearestTanker?.distKm ?? 2} km away, ETA ~${etaMinutes} min) to ${campName}. Volunteer ${assignedVolunteer?.item.name ?? "Desk"} assigned for refill verification.`
             : type === "FOOD"
-            ? `Dispatch food unit ${nearestFood?.item.id ?? "nearest kitchen"} (${nearestFood?.item.name ?? "Mobile Kitchen"}) to ${nearestCamp?.item.name ?? "Dindi position"}. Contact: ${nearestFood?.item.phone ?? "Control Desk"}.`
+            ? `Dispatch Mobile Kitchen ${nearestFood?.item.name ?? "Central Anna Dan Kitchen"} (${nearestFood?.item.mealsCapacity.toLocaleString()} meals) from ${nearestFood?.item.currentHub ?? "Hub"} (${nearestFood?.distKm ?? 3} km away, ETA ~${etaMinutes} min) to ${campName}. Volunteer ${assignedVolunteer?.item.name ?? "Desk"} assigned for prasad distribution.`
+            : type === "MEDICAL"
+            ? `Alert ${nearestMedical?.item.name ?? "General Hospital"} (${nearestMedical?.distKm ?? 2} km away) and dispatch Mobile Ambulance (ETA ~${etaMinutes} min) to ${campName} with on-duty emergency team.`
             : type === "SANITATION"
-            ? `Dispatch sanitation crew ${nearestSanitation?.item.id ?? "nearest crew"} (Lead: ${nearestSanitation?.item.leadName ?? "Crew Lead"}) to ${nearestCamp?.item.name ?? "Dindi position"}. ${nearestSanitation?.item.mobilePodsCount ?? 0} mobile pods.`
-            : `Acknowledge halt at ${nearestCamp?.item.name ?? "nearest safe rest ground"}.`;
+            ? `Deploy ${nearestSanitation?.item.name ?? "Sanitation Squad"} (${nearestSanitation?.item.mobilePodsCount ?? 20} mobile pods) from ${nearestSanitation?.item.zone ?? "Depot"} (${nearestSanitation?.distKm ?? 2} km away, ETA ~${etaMinutes} min) to ${campName}.`
+            : `Acknowledge halt at ${campName}. Direct pilgrims to verified holding pavilion.`;
 
         const newAlert: Alert = {
           id: `ALT-LEADER-${nowId}`,
           title: `${typeLabel} — Dindi Leader Request`,
-          location: nearestCamp?.item.name ?? "Live Dindi GPS Position",
+          location: campName,
           severity: type === "MEDICAL" ? "HIGH" : "MEDIUM",
           cause: details,
           forecastText: `Immediate assistance dispatched. Assigned field volunteer: ${assignedVolunteer?.item.name ?? "Corridor Seva Desk"}. Estimated response: ${etaMinutes} min.`,
@@ -566,19 +600,19 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
           ? {
               id: `TASK-${nowId}`,
               campId: nearestCamp?.item.id,
-              campName: nearestCamp?.item.name ?? "Live Dindi GPS Location",
+              campName: campName,
               volunteerId: assignedVolunteer.item.id,
               volunteerName: assignedVolunteer.item.name,
               title:
                 type === "WATER"
-                  ? `Verify water tanker ${nearestTanker?.item.id ?? "tanker"} arrival`
+                  ? `Verify water tanker ${nearestTanker?.item.id ?? "tanker"} arrival (${nearestTanker?.item.capacityLiters.toLocaleString()}L)`
                   : type === "MEDICAL"
-                  ? "Verify medical emergency response team"
+                  ? `Verify medical emergency response team (${nearestMedical?.item.name ?? "Hospital"})`
                   : type === "FOOD"
-                  ? `Verify food supply unit ${nearestFood?.item.id ?? "kitchen"} arrival`
+                  ? `Verify food supply unit ${nearestFood?.item.name ?? "kitchen"} delivery`
                   : type === "SANITATION"
-                  ? `Verify sanitation crew ${nearestSanitation?.item.id ?? "crew"} deployment`
-                  : "Verify halt capacity and devotee rest area",
+                  ? `Verify sanitation crew ${nearestSanitation?.item.name ?? "crew"} deployment`
+                  : `Verify halt capacity and rest area at ${campName}`,
               type:
                 type === "WATER" ? "WATER_TANKER" :
                 type === "MEDICAL" ? "MEDICAL" :

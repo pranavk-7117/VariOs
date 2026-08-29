@@ -78,14 +78,88 @@ export default function IncidentsPage() {
             {liveClusters.map((cluster) => {
               const targetCamp = cluster.nearestCamp?.item;
               const isOvercrowded = cluster.occupancyPercent >= 100;
+              const isElevated = cluster.occupancyPercent >= 75 || cluster.totalPilgrims >= 20000;
+              const isNominal = !isElevated && !isOvercrowded;
+
               const waterDemandL = cluster.totalPilgrims * 3;
               const foodMealsDemand = cluster.totalPilgrims;
-              const sanitationPodsDemand = Math.max(10, Math.round(cluster.totalPilgrims / 50));
+              const sanitationPodsDemand = Math.max(2, Math.round(cluster.totalPilgrims / 50));
               const availableTanker = state.tankers.find((t) => t.status === "AVAILABLE");
               const availableFood = state.foodSupplies?.find((f) => f.status === "AVAILABLE");
               const availableSanitation = state.sanitationCrews.find((s) => s.status === "AVAILABLE");
               const largestDindi = [...cluster.dindis].sort((a, b) => b.pilgrimCount - a.pilgrimCount)[0];
               const backupCamp = state.camps.find((c) => c.id !== targetCamp?.id && c.occupancyPercent < 60) ?? state.camps[1];
+
+              if (isNominal && !allVerified) {
+                return (
+                  <div
+                    key={cluster.id}
+                    className="card-base p-6 border-2 border-emerald-300 bg-emerald-50/30 space-y-4 shadow-sm"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-emerald-200">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-bold text-emerald-800 uppercase tracking-wide">
+                            🟢 Live Telemetry &amp; Sector Monitoring
+                          </span>
+                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                            NOMINAL FLOW ({cluster.occupancyPercent}% LOAD)
+                          </span>
+                        </div>
+                        <h2 className="text-lg font-bold text-wari-textPrimary">{cluster.name}</h2>
+                        <p className="text-xs text-wari-textMuted">
+                          GPS {cluster.lat.toFixed(4)}°N, {cluster.lng.toFixed(4)}°E • Sector: {targetCamp?.name ?? "Corridor Sector"} • Capacity: {targetCamp?.capacity.toLocaleString() ?? 40000}
+                        </p>
+                      </div>
+
+                      <div className="px-3 py-1.5 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>All Safe • No Congestion</span>
+                      </div>
+                    </div>
+
+                    {/* 4 Nominal Metrics Cards */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                      <div className="bg-white rounded-xl border border-emerald-200 p-3.5 shadow-xs">
+                        <span className="text-wari-textMuted block font-medium">Devotees Present</span>
+                        <span className="font-black text-base text-wari-textPrimary">{cluster.totalPilgrims.toLocaleString()}</span>
+                        <span className="text-[10px] text-emerald-700 block font-semibold mt-0.5">
+                          Safe ({cluster.occupancyPercent}% of {cluster.capacity.toLocaleString()})
+                        </span>
+                      </div>
+
+                      <div className="bg-white rounded-xl border border-emerald-200 p-3.5 shadow-xs">
+                        <span className="text-wari-textMuted block font-medium">Water Reserves Load</span>
+                        <span className="font-black text-base text-blue-700">{waterDemandL.toLocaleString()} L</span>
+                        <span className="text-[10px] text-emerald-700 font-bold block mt-0.5">
+                          {targetCamp?.waterStockPercent ?? 95}% Stock — Adequate
+                        </span>
+                      </div>
+
+                      <div className="bg-white rounded-xl border border-emerald-200 p-3.5 shadow-xs">
+                        <span className="text-wari-textMuted block font-medium">Food / Prasad Load</span>
+                        <span className="font-black text-base text-amber-700">{foodMealsDemand.toLocaleString()} Meals</span>
+                        <span className="text-[10px] text-emerald-700 font-bold block mt-0.5">
+                          Normal Kitchen Supply
+                        </span>
+                      </div>
+
+                      <div className="bg-white rounded-xl border border-emerald-200 p-3.5 shadow-xs">
+                        <span className="text-wari-textMuted block font-medium">Sanitation Demand</span>
+                        <span className="font-black text-base text-teal-700">{sanitationPodsDemand} Pods</span>
+                        <span className="text-[10px] text-emerald-700 font-bold block mt-0.5">
+                          Optimal Availability
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-white/80 rounded-xl border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between">
+                      <span>✓ Sector is operating well within safe crowd limits. Multi-agency emergency dispatch is not required.</span>
+                      <span className="text-[11px] font-mono font-bold text-emerald-700">Pacing: Normal (4.2 km/h)</span>
+                    </div>
+                  </div>
+                );
+              }
 
               return (
                 <div
@@ -119,7 +193,7 @@ export default function IncidentsPage() {
                       {allVerified ? (
                         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold">
                           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                          <span>Problem Solved & Verified</span>
+                          <span>Problem Solved &amp; Verified</span>
                         </div>
                       ) : isMitigatedLive ? (
                         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-100 border border-blue-300 text-blue-800 text-xs font-bold animate-pulse">
@@ -132,7 +206,7 @@ export default function IncidentsPage() {
                           className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 hover:from-red-700 hover:to-orange-700 active:scale-95 text-white font-bold text-xs shadow-md flex items-center gap-2 transition-all"
                         >
                           <Zap className="w-4 h-4 text-yellow-300 animate-bounce" />
-                          <span>⚡ Apply AI Multi-Resource Mitigation & Dispatch (1-Click)</span>
+                          <span>⚡ Apply AI Multi-Resource Mitigation &amp; Dispatch (1-Click)</span>
                         </button>
                       )}
                     </div>
@@ -210,7 +284,7 @@ export default function IncidentsPage() {
                       <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1">
                         <div className="font-bold text-blue-900 flex items-center gap-1.5">
                           <Droplets className="w-3.5 h-3.5 text-blue-600" />
-                          <span>3. Roadside Mobile Water & Food Staging</span>
+                          <span>3. Roadside Mobile Water &amp; Food Staging</span>
                         </div>
                         <p className="text-[11px] text-blue-800">
                           Dispatch Water Tanker <strong>{availableTanker?.id ?? "LIVE-WATER-PUNE-01"}</strong> &amp; Kitchen <strong>{availableFood?.name ?? "Alandi Kitchen"}</strong> to roadside staging bays along the march route.
@@ -227,6 +301,7 @@ export default function IncidentsPage() {
                         </p>
                       </div>
                     </div>
+                  </div>
 
                     {/* Quick 1-tap dispatch bar */}
                     {!allVerified && !isMitigatedLive && (
@@ -265,7 +340,6 @@ export default function IncidentsPage() {
                         )}
                       </div>
                     )}
-                  </div>
 
                   {/* Dynamic Dindi Synchronization & Halt Planning Feature Panel */}
                   {syncPlan && (

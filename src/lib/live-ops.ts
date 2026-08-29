@@ -68,21 +68,28 @@ export function getLiveCrowdClusters(params: {
   params.dindis
     .filter((dindi) => dindi.isCustomRegistered)
     .forEach((dindi) => {
-      const key = `${dindi.lat.toFixed(CO_LOCATION_PRECISION)},${dindi.lng.toFixed(CO_LOCATION_PRECISION)}`;
+      const targetCamp = (dindi as any).reroutedCampId
+        ? params.camps.find((c) => c.id === (dindi as any).reroutedCampId)
+        : null;
+      const effectiveLat = targetCamp ? targetCamp.lat : dindi.lat;
+      const effectiveLng = targetCamp ? targetCamp.lng : dindi.lng;
+
+      const key = `${effectiveLat.toFixed(CO_LOCATION_PRECISION)},${effectiveLng.toFixed(CO_LOCATION_PRECISION)}`;
       groups.set(key, [...(groups.get(key) ?? []), dindi]);
     });
 
   return Array.from(groups.entries())
     .map(([key, dindis]) => {
-      const totalPilgrims = dindis.reduce((sum, dindi) => sum + dindi.pilgrimCount, 0);
       const [lat, lng] = key.split(",").map(Number);
       const nearestCamp = nearest(lat, lng, params.camps);
       const holdingCapacity = nearestCamp?.item.capacity ?? 40000;
+      const totalPilgrims = dindis.reduce((sum, dindi) => sum + dindi.pilgrimCount, 0);
       const occupancyPercent = Math.round((totalPilgrims / holdingCapacity) * 100);
+      const overcrowdedBy = Math.max(0, totalPilgrims - holdingCapacity);
       const clusterName =
         dindis.length > 1
           ? `${dindis.map((dindi) => dindi.name).join(" + ")} co-located`
-          : dindis[0].name;
+          : `${dindis[0].name} (${nearestCamp?.item.name ?? "Corridor Sector"})`;
 
       return {
         id: `LIVE-CLUSTER-${key}`,

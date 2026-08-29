@@ -72,6 +72,8 @@ interface SimulationContextType {
   deleteDindi: (dindiId: string) => void;
   applyLiveClusterMitigation: (clusterId?: string) => void;
   rerouteLiveDindi: (dindiId: string, targetCampId: string) => void;
+  openTemporaryAuxiliaryCamp: (baseCampId: string) => void;
+  regulatePalkhiPace: (action: "THROTTLE_PACE" | "RELEASE_BATCH") => void;
 }
 
 const SimulationContext = createContext<SimulationContextType | undefined>(undefined);
@@ -1213,6 +1215,72 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     );
   }, []);
 
+  const openTemporaryAuxiliaryCamp = useCallback((baseCampId: string) => {
+    const ts = new Date();
+    const timeString = `${ts.getHours().toString().padStart(2, "0")}:${ts.getMinutes().toString().padStart(2, "0")}:${ts.getSeconds().toString().padStart(2, "0")}`;
+
+    setState((prev) => {
+      const targetCamp = prev.camps.find((c) => c.id === baseCampId) ?? prev.camps[0];
+      const targetCampName = targetCamp?.name ?? "Corridor Sector";
+
+      const updatedCamps = prev.camps.map((c) =>
+        c.id === targetCamp.id
+          ? {
+              ...c,
+              capacity: c.capacity + 25000,
+              name: `${c.name} + Auxiliary Relief Yard`,
+              waterStockPercent: 100,
+              foodStockPercent: 100,
+            }
+          : c
+      );
+
+      const recomputedCamps = updatedCamps.map((camp) => {
+        const occupancyPercent = Math.min(100, Math.round((camp.currentOccupancy / camp.capacity) * 100));
+        return { ...camp, occupancyPercent };
+      });
+
+      return {
+        ...prev,
+        camps: recomputedCamps,
+        events: [
+          {
+            id: `EV-AUX-CAMP-${Date.now()}`,
+            timestamp: timeString,
+            eventType: "DECISION" as const,
+            severity: "SUCCESS" as any,
+            source: "AI Operations Copilot",
+            description: `Opened Emergency Auxiliary Satellite Ground (+25,000 Capacity) adjacent to ${targetCampName}. Total capacity expanded to ${(targetCamp.capacity + 25000).toLocaleString()} devotees.`,
+          },
+          ...prev.events,
+        ],
+      };
+    });
+  }, []);
+
+  const regulatePalkhiPace = useCallback((action: "THROTTLE_PACE" | "RELEASE_BATCH") => {
+    const ts = new Date();
+    const timeString = `${ts.getHours().toString().padStart(2, "0")}:${ts.getMinutes().toString().padStart(2, "0")}:${ts.getSeconds().toString().padStart(2, "0")}`;
+
+    setState((prev) => ({
+      ...prev,
+      events: [
+        {
+          id: `EV-PACE-${Date.now()}`,
+          timestamp: timeString,
+          eventType: "DECISION" as const,
+          severity: "INFO" as const,
+          source: "Palkhi Marshal Coordination",
+          description:
+            action === "THROTTLE_PACE"
+              ? "Palkhi march pace throttled from 4.2 km/h down to 2.5 km/h. 45-minute staggered batch gating activated at Swargate & Hadapsar."
+              : "Next 15,000 devotee batch cleared and released from gating checkpoint forward to transit sector.",
+        },
+        ...prev.events,
+      ],
+    }));
+  }, []);
+
   return (
     <SimulationContext.Provider
       value={{
@@ -1240,6 +1308,8 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         deleteDindi,
         applyLiveClusterMitigation,
         rerouteLiveDindi,
+        openTemporaryAuxiliaryCamp,
+        regulatePalkhiPace,
       }}
     >
       {children}

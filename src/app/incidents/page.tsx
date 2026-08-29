@@ -33,6 +33,8 @@ export default function IncidentsPage() {
     openBackupShelterB,
     applyLiveClusterMitigation,
     rerouteLiveDindi,
+    openTemporaryAuxiliaryCamp,
+    regulatePalkhiPace,
     isMitigated,
   } = useSimulation();
 
@@ -174,43 +176,49 @@ export default function IncidentsPage() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                      <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1">
-                        <div className="font-bold text-blue-900 flex items-center gap-1.5">
-                          <Droplets className="w-3.5 h-3.5 text-blue-600" />
-                          <span>1. Water Supply Reinforcement</span>
+                      <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-1">
+                        <div className="font-bold text-indigo-900 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Compass className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>1. Open Temporary Satellite Ground (+25k)</span>
+                          </span>
+                          <span className="text-[10px] bg-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded font-bold">Recommended</span>
                         </div>
-                        <p className="text-[11px] text-blue-800">
-                          Dispatch nearest Water Tanker <strong>{availableTanker?.id ?? "LIVE-WATER-PUNE-01"}</strong> ({(availableTanker?.capacityLiters ?? 10000).toLocaleString()}L) from {availableTanker?.currentHub ?? "Pune Hub"} to {targetCamp?.name ?? "Camp 1"}.
+                        <p className="text-[11px] text-indigo-800">
+                          Activate adjacent open-air holding shelter (e.g. <strong>{targetCamp?.name ?? "Camp 1"} Outer Auxiliary Grounds</strong>) to add +25,000 capacity on the spot without making devotees walk far.
                         </p>
                       </div>
 
                       <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-1">
-                        <div className="font-bold text-amber-900 flex items-center gap-1.5">
-                          <Utensils className="w-3.5 h-3.5 text-amber-600" />
-                          <span>2. Anna Dan / Prasad Kitchen Dispatch</span>
+                        <div className="font-bold text-amber-900 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-amber-600" />
+                            <span>2. Regulate Palkhi March Rhythm (2.5 km/h)</span>
+                          </span>
+                          <span className="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold">Pacing</span>
                         </div>
                         <p className="text-[11px] text-amber-800">
-                          Mobilize Mobile Kitchen <strong>{availableFood?.name ?? "Alandi-Pune Central Anna Dan Kitchen"}</strong> ({(availableFood?.mealsCapacity ?? 50000).toLocaleString()} meals) to {targetCamp?.name ?? "Camp 1"}.
+                          Slow march pace from 4.2 to 2.5 km/h and gate arrivals into <strong>15,000-devotee batches every 45 min</strong> at the approach lane to decompress corridor choke points.
+                        </p>
+                      </div>
+
+                      <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1">
+                        <div className="font-bold text-blue-900 flex items-center gap-1.5">
+                          <Droplets className="w-3.5 h-3.5 text-blue-600" />
+                          <span>3. Roadside Mobile Water & Food Staging</span>
+                        </div>
+                        <p className="text-[11px] text-blue-800">
+                          Dispatch Water Tanker <strong>{availableTanker?.id ?? "LIVE-WATER-PUNE-01"}</strong> &amp; Kitchen <strong>{availableFood?.name ?? "Alandi Kitchen"}</strong> to roadside staging bays along the march route.
                         </p>
                       </div>
 
                       <div className="p-3 bg-teal-50/70 border border-teal-200 rounded-xl space-y-1">
                         <div className="font-bold text-teal-900 flex items-center gap-1.5">
                           <Users className="w-3.5 h-3.5 text-teal-600" />
-                          <span>3. Sanitation Squad Deployment</span>
+                          <span>4. Mobile Bio-Toilet Squad Deployment</span>
                         </div>
                         <p className="text-[11px] text-teal-800">
-                          Deploy <strong>{availableSanitation?.name ?? "Pune Municipal Bio-Toilet Squad 1"}</strong> ({availableSanitation?.mobilePodsCount ?? 24} mobile pods) to handle devotee surge.
-                        </p>
-                      </div>
-
-                      <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-1">
-                        <div className="font-bold text-purple-900 flex items-center gap-1.5">
-                          <RefreshCw className="w-3.5 h-3.5 text-purple-600" />
-                          <span>4. Overflow Dindi Rerouting</span>
-                        </div>
-                        <p className="text-[11px] text-purple-800">
-                          Divert <strong>{largestDindi?.name ?? "Test3"}</strong> (~{(largestDindi?.pilgrimCount ?? 50000).toLocaleString()} devotees) towards <strong>{backupCamp?.name ?? "Camp 2 (Hadapsar Transit Yard)"}</strong> ({backupCamp?.occupancyPercent}% occupied).
+                          Deploy <strong>{availableSanitation?.name ?? "Pune Municipal Squad 1"}</strong> ({availableSanitation?.mobilePodsCount ?? 24} pods) to prevent open sanitation overload.
                         </p>
                       </div>
                     </div>
@@ -225,15 +233,22 @@ export default function IncidentsPage() {
                           <Zap className="w-3.5 h-3.5 text-yellow-300" />
                           <span>Execute Full AI Mitigation Plan</span>
                         </button>
-                        {largestDindi && backupCamp && (
+                        {targetCamp && (
                           <button
-                            onClick={() => rerouteLiveDindi(largestDindi.id, backupCamp.id)}
-                            className="px-3 py-2 rounded-xl bg-purple-50 border border-purple-200 hover:bg-purple-100 text-purple-800 font-bold text-xs flex items-center gap-1.5"
+                            onClick={() => openTemporaryAuxiliaryCamp(targetCamp.id)}
+                            className="px-3 py-2 rounded-xl bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-800 font-bold text-xs flex items-center gap-1.5 active:scale-95"
                           >
-                            <RefreshCw className="w-3.5 h-3.5 text-purple-600" />
-                            <span>Reroute {largestDindi.name} to {backupCamp.name}</span>
+                            <Compass className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>Open Temporary Satellite Ground (+25k)</span>
                           </button>
                         )}
+                        <button
+                          onClick={() => regulatePalkhiPace("THROTTLE_PACE")}
+                          className="px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-800 font-bold text-xs flex items-center gap-1.5 active:scale-95"
+                        >
+                          <Clock className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Throttle March Pace (2.5 km/h / 45m Batch)</span>
+                        </button>
                       </div>
                     )}
                   </div>

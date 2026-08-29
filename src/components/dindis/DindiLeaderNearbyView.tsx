@@ -85,14 +85,33 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
     .sort((a, b) => a.distKm - b.distKm)
     .slice(0, 4);
 
-  const handleQuickRequest = (type: "WATER" | "MEDICAL" | "HALT" | "ROAD" | "SANITATION", label: string) => {
+  // Compute nearby food supply kitchens
+  const nearbyFood = (state.foodSupplies || [])
+    .map((f) => {
+      const distKm = getDistanceKm(currentLat, currentLng, f.lat, f.lng);
+      const eta = Math.max(1, Math.round((distKm / 30) * 60));
+      return { ...f, distKm, calculatedEta: eta };
+    })
+    .sort((a, b) => a.distKm - b.distKm)
+    .slice(0, 3);
+
+  // Compute nearby sanitation crews & bio-toilets
+  const nearbySanitation = state.sanitationCrews
+    .map((s) => {
+      const distKm = getDistanceKm(currentLat, currentLng, s.lat, s.lng);
+      return { ...s, distKm };
+    })
+    .sort((a, b) => a.distKm - b.distKm)
+    .slice(0, 3);
+
+  const handleQuickRequest = (type: "WATER" | "MEDICAL" | "HALT" | "ROAD" | "SANITATION" | "FOOD", label: string) => {
     const posStr = activeDindi
       ? `${activeDindi.name} (Code: ${activeDindi.passcode || activeDindi.number}) at Lat ${activeDindi.lat.toFixed(4)}, Lng ${activeDindi.lng.toFixed(4)}`
       : coords
       ? `Lat ${coords.lat.toFixed(4)}, Lng ${coords.lng.toFixed(4)}`
       : "Corridor GPS";
     
-    if (type === "WATER" || type === "MEDICAL" || type === "HALT") {
+    if (type === "WATER" || type === "MEDICAL" || type === "HALT" || type === "FOOD" || type === "SANITATION") {
       requestLeaderAssistance(type, `${label} requested for ${posStr}`);
     } else {
       addEventLog({
@@ -139,50 +158,59 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
           </div>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <button
             onClick={() => handleQuickRequest("WATER", "💧 Urgent Water Tanker Request")}
-            className="p-3.5 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-left transition-all active:scale-98"
+            className="p-3 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-left transition-all active:scale-98"
           >
-            <Droplets className="w-5 h-5 text-blue-600 mb-1.5" />
-            <div className="text-xs font-bold text-blue-900">Request Water</div>
-            <div className="text-[10px] text-blue-700 mt-0.5">Tanker refill</div>
+            <Droplets className="w-4 h-4 text-blue-600 mb-1" />
+            <div className="text-xs font-bold text-blue-900">Water Tanker</div>
+            <div className="text-[10px] text-blue-700">Refill supply</div>
+          </button>
+
+          <button
+            onClick={() => handleQuickRequest("FOOD", "🍱 Urgent Prasad & Food Supply Request")}
+            className="p-3 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-left transition-all active:scale-98"
+          >
+            <Building2 className="w-4 h-4 text-amber-600 mb-1" />
+            <div className="text-xs font-bold text-amber-900">Food / Prasad</div>
+            <div className="text-[10px] text-amber-700">Mobile kitchen</div>
+          </button>
+
+          <button
+            onClick={() => handleQuickRequest("SANITATION", "🚻 Mobile Toilet Clean & Servicing")}
+            className="p-3 rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-200 text-left transition-all active:scale-98"
+          >
+            <Users className="w-4 h-4 text-teal-600 mb-1" />
+            <div className="text-xs font-bold text-teal-900">Sanitation</div>
+            <div className="text-[10px] text-teal-700">Bio-toilet team</div>
           </button>
 
           <button
             onClick={() => handleQuickRequest("MEDICAL", "🚑 Medical Emergency / First Aid")}
-            className="p-3.5 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-left transition-all active:scale-98"
+            className="p-3 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-left transition-all active:scale-98"
           >
-            <Stethoscope className="w-5 h-5 text-red-600 mb-1.5" />
+            <Stethoscope className="w-4 h-4 text-red-600 mb-1" />
             <div className="text-xs font-bold text-red-900">Medical Aid</div>
-            <div className="text-[10px] text-red-700 mt-0.5">Doctor / Ambulance</div>
+            <div className="text-[10px] text-red-700">Doctor / ICU</div>
           </button>
 
           <button
-            onClick={() => handleQuickRequest("HALT", "⛺ Halt / Rest Extension Request")}
-            className="p-3.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-left transition-all active:scale-98"
+            onClick={() => handleQuickRequest("HALT", "⛺ Halt / Rest Ground Request")}
+            className="p-3 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-left transition-all active:scale-98"
           >
-            <Building2 className="w-5 h-5 text-purple-600 mb-1.5" />
+            <Building2 className="w-4 h-4 text-purple-600 mb-1" />
             <div className="text-xs font-bold text-purple-900">Halt Request</div>
-            <div className="text-[10px] text-purple-700 mt-0.5">Camp capacity</div>
+            <div className="text-[10px] text-purple-700">Rest capacity</div>
           </button>
 
           <button
             onClick={() => handleQuickRequest("ROAD", "🚧 Road Bottleneck / Diversion Notice")}
-            className="p-3.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-left transition-all active:scale-98"
+            className="p-3 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-left transition-all active:scale-98"
           >
-            <Construction className="w-5 h-5 text-amber-600 mb-1.5" />
-            <div className="text-xs font-bold text-amber-900">Road Blocked</div>
-            <div className="text-[10px] text-amber-700 mt-0.5">Traffic slowdown</div>
-          </button>
-
-          <button
-            onClick={() => handleQuickRequest("SANITATION", "🚻 Mobile Toilet Sanitization")}
-            className="p-3.5 rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-200 text-left transition-all active:scale-98 col-span-2 sm:col-span-1"
-          >
-            <Users className="w-5 h-5 text-teal-600 mb-1.5" />
-            <div className="text-xs font-bold text-teal-900">Sanitation</div>
-            <div className="text-[10px] text-teal-700 mt-0.5">Mobile toilet crew</div>
+            <Construction className="w-4 h-4 text-orange-600 mb-1" />
+            <div className="text-xs font-bold text-orange-900">Road Blocked</div>
+            <div className="text-[10px] text-orange-700">Traffic assist</div>
           </button>
         </div>
       </div>
@@ -249,7 +277,7 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
             {/* Camps & Halts */}
             <div className="pt-2">
               <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider block mb-1.5">
-                ⛺ Closest Halts & Rest Grounds (Camps 1–6)
+                ⛺ Closest Halts & Rest Grounds (Camps 1–8)
               </span>
               <div className="space-y-2">
                 {nearbyCamps.map((c) => (
@@ -257,7 +285,7 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
                     <div>
                       <div className="font-bold text-wari-textPrimary">{c.name}</div>
                       <div className="text-[11px] text-wari-textMuted">
-                        Capacity: {c.capacity.toLocaleString()} • Water: {c.waterStockPercent}% • Approx. {c.walkingHours}h walk
+                        Capacity: {c.capacity.toLocaleString()} • Water: {c.waterStockPercent}% • Food: {c.foodStockPercent}% • Approx. {c.walkingHours}h walk
                       </div>
                     </div>
                     <div className="text-right shrink-0 pl-2">
@@ -288,6 +316,52 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
                     <div className="text-right shrink-0 pl-2">
                       <span className="font-bold text-blue-700 text-sm block">{t.distKm} km</span>
                       <span className="text-[10px] text-blue-600 font-semibold block">ETA ~{t.calculatedEta}m</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Anna Dan & Prasad Kitchens */}
+            <div className="pt-2">
+              <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider block mb-1.5">
+                🍲 Closest Anna Dan & Prasad Kitchens
+              </span>
+              <div className="space-y-2">
+                {nearbyFood.map((f) => (
+                  <div key={f.id} className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/80 flex items-center justify-between text-xs">
+                    <div>
+                      <div className="font-bold text-amber-950">{f.name}</div>
+                      <div className="text-[11px] text-amber-800">
+                        {f.mealsCapacity.toLocaleString()} Meals • {f.leadName} ({f.phone})
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 pl-2">
+                      <span className="font-bold text-amber-700 text-sm block">{f.distKm} km</span>
+                      <span className="text-[10px] text-amber-600 font-semibold block">ETA ~{f.calculatedEta}m</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Mobile Bio-Toilet Pods & Sanitation */}
+            <div className="pt-2">
+              <span className="text-[11px] font-bold text-teal-700 uppercase tracking-wider block mb-1.5">
+                🚻 Closest Washrooms & Mobile Bio-Toilet Squads
+              </span>
+              <div className="space-y-2">
+                {nearbySanitation.map((s) => (
+                  <div key={s.id} className="p-3 bg-teal-50/60 rounded-xl border border-teal-200/80 flex items-center justify-between text-xs">
+                    <div>
+                      <div className="font-bold text-teal-950">{s.name}</div>
+                      <div className="text-[11px] text-teal-800">
+                        {s.mobilePodsCount || 20} Mobile Pods • Lead: {s.leadName} {s.phone ? `(${s.phone})` : ""}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 pl-2">
+                      <span className="font-bold text-teal-700 text-sm block">{s.distKm} km</span>
+                      <span className="text-[10px] text-teal-600 font-semibold block">{s.status}</span>
                     </div>
                   </div>
                 ))}

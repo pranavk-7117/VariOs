@@ -16,6 +16,7 @@ import {
   DEMO_INITIAL_STATE,
   LIVE_SUPPORT_CAMPS,
   LIVE_SUPPORT_TANKERS,
+  LIVE_SUPPORT_FOOD_SUPPLIES,
   LIVE_SUPPORT_VOLUNTEERS,
 } from "@/lib/constants";
 import {
@@ -50,7 +51,7 @@ interface SimulationContextType {
     lng: number;
   }) => { dindiId: string; passcode: string; dindiNumber: number };
   updateLiveDindiLocation: (dindiId: string, lat: number, lng: number, speedKmH?: number) => void;
-  requestLeaderAssistance: (type: "WATER" | "MEDICAL" | "HALT", details: string) => void;
+  requestLeaderAssistance: (type: "WATER" | "MEDICAL" | "HALT" | "FOOD" | "SANITATION", details: string) => void;
   reportVolunteerIncident: (params: {
     label: string;
     severity: "HIGH" | "CRITICAL" | "MEDIUM";
@@ -430,10 +431,10 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const requestLeaderAssistance = useCallback(
-    (type: "WATER" | "MEDICAL" | "HALT", details: string) => {
+    (type: "WATER" | "MEDICAL" | "HALT" | "FOOD" | "SANITATION", details: string) => {
       const ts = new Date();
       const timeString = `${ts.getHours().toString().padStart(2, "0")}:${ts.getMinutes().toString().padStart(2, "0")}:${ts.getSeconds().toString().padStart(2, "0")}`;
-      const typeLabel = type === "WATER" ? "💧 Water Tanker" : type === "MEDICAL" ? "🚑 Medical Aid" : "⛺ Halt Request";
+      const typeLabel = type === "WATER" ? "💧 Water Tanker" : type === "MEDICAL" ? "🚑 Medical Aid" : type === "FOOD" ? "🍱 Food Supply" : type === "SANITATION" ? "🚽 Sanitation Crew" : "⛺ Halt Request";
       const nowId = Date.now();
 
       setState((prev) => {
@@ -442,12 +443,44 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         const nearestCamp = topCluster?.nearestCamp;
         const nearestTanker = topCluster?.nearestTanker;
         const nearestMedical = topCluster?.nearestMedical;
+
+        // Find nearest available food supply unit
+        const nearestFood = prev.foodSupplies
+          ?.filter((f) => f.status === "AVAILABLE")
+          .map((f) => ({ item: f, distKm: getDistanceKm(nearestCamp?.item.lat ?? 18.5138, nearestCamp?.item.lng ?? 73.8589, f.lat, f.lng) }))
+          .sort((a, b) => a.distKm - b.distKm)[0];
+
+        // Find nearest available sanitation crew
+        const nearestSanitation = prev.sanitationCrews
+          ?.filter((s) => s.status === "AVAILABLE")
+          .map((s) => ({ item: s, distKm: getDistanceKm(nearestCamp?.item.lat ?? 18.5138, nearestCamp?.item.lng ?? 73.8589, s.lat, s.lng) }))
+          .sort((a, b) => a.distKm - b.distKm)[0];
+
         const assignedVolunteer =
           topCluster?.nearestVolunteers[0] ??
           prev.volunteers
-            .map((volunteer) => ({ volunteer, distanceKm: getDistanceKm(18.5138, 73.8589, volunteer.lat, volunteer.lng) }))
-            .sort((a, b) => a.distanceKm - b.distanceKm)[0];
-        const etaMinutes = nearestTanker?.distanceKm ? Math.max(5, Math.round((nearestTanker.distanceKm / 25) * 60)) : 15;
+            .filter((v) => v.status === "AVAILABLE")
+            .map((volunteer) => ({ item: volunteer, distKm: getDistanceKm(18.5138, 73.8589, volunteer.lat, volunteer.lng) }))
+            .sort((a, b) => a.distKm - b.distKm)[0];
+
+        const etaMinutes = type === "WATER"
+          ? (nearestTanker?.distanceKm ? Math.max(5, Math.round((nearestTanker.distanceKm / 25) * 60)) : 15)
+          : type === "FOOD"
+          ? (nearestFood?.distKm ? Math.max(5, Math.round((nearestFood.distKm / 30) * 60)) : 12)
+          : type === "SANITATION"
+          ? (nearestSanitation?.distKm ? Math.max(5, Math.round((nearestSanitation.distKm / 20) * 60)) : 10)
+          : 15;
+
+        const resourceDescription =
+          type === "WATER"
+            ? `Dispatch water tanker ${nearestTanker?.item.id ?? "nearest tanker"} from ${nearestTanker?.item.currentHub ?? "staging hub"} to ${nearestCamp?.item.name ?? "Dindi position"}.`
+            : type === "MEDICAL"
+            ? `Alert medical station ${nearestMedical?.item.name ?? "Deenanath Mangeshkar"} and mobilize field doctor.`
+            : type === "FOOD"
+            ? `Dispatch food unit ${nearestFood?.item.id ?? "nearest kitchen"} (${nearestFood?.item.name ?? "Mobile Kitchen"}) to ${nearestCamp?.item.name ?? "Dindi position"}. Contact: ${nearestFood?.item.phone ?? "Control Desk"}.`
+            : type === "SANITATION"
+            ? `Dispatch sanitation crew ${nearestSanitation?.item.id ?? "nearest crew"} (Lead: ${nearestSanitation?.item.leadName ?? "Crew Lead"}) to ${nearestCamp?.item.name ?? "Dindi position"}. ${nearestSanitation?.item.mobilePodsCount ?? 0} mobile pods.`
+            : `Acknowledge halt at ${nearestCamp?.item.name ?? "nearest safe rest ground"}.`;
 
         const newAlert: Alert = {
           id: `ALT-LEADER-${nowId}`,
@@ -456,18 +489,14 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
           severity: type === "MEDICAL" ? "HIGH" : "MEDIUM",
           cause: details,
           forecastText: `Immediate assistance dispatched. Assigned field volunteer: ${assignedVolunteer?.item.name ?? "Corridor Seva Desk"}. Estimated response: ${etaMinutes} min.`,
-          recommendedAction:
-            type === "WATER"
-              ? `Dispatch water tanker ${nearestTanker?.item.id ?? "T-03"} from ${nearestTanker?.item.currentHub ?? "Hadapsar Hub"} to ${nearestCamp?.item.name ?? "Dindi position"}.`
-              : type === "MEDICAL"
-                ? `Alert medical station ${nearestMedical?.item.name ?? "Deenanath Mangeshkar"} and mobilize field doctor.`
-                : `Acknowledge halt at ${nearestCamp?.item.name ?? "nearest safe rest ground"}.`,
+          recommendedAction: resourceDescription,
           timestamp: timeString,
           status: "ACTIVE",
           timeToCriticalMinutes: type === "MEDICAL" ? 5 : 15,
-          priorityScore: type === "MEDICAL" ? 80 : type === "WATER" ? 62 : 44,
+          priorityScore: type === "MEDICAL" ? 80 : type === "WATER" ? 62 : type === "FOOD" ? 55 : type === "SANITATION" ? 50 : 44,
           scoreBreakdown: { density: 10, urgency: type === "MEDICAL" ? 40 : 18, population: 10, resource: type === "WATER" ? 24 : 15 },
         };
+
         const newTask: VolunteerTask | null = assignedVolunteer
           ? {
               id: `TASK-${nowId}`,
@@ -477,11 +506,19 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
               volunteerName: assignedVolunteer.item.name,
               title:
                 type === "WATER"
-                  ? `Verify water tanker ${nearestTanker?.item.id ?? "T-03"} arrival`
+                  ? `Verify water tanker ${nearestTanker?.item.id ?? "tanker"} arrival`
                   : type === "MEDICAL"
-                    ? "Verify medical emergency response team"
-                    : "Verify halt capacity and devotee rest area",
-              type: type === "WATER" ? "WATER_TANKER" : type === "MEDICAL" ? "MEDICAL" : "HALT",
+                  ? "Verify medical emergency response team"
+                  : type === "FOOD"
+                  ? `Verify food supply unit ${nearestFood?.item.id ?? "kitchen"} arrival`
+                  : type === "SANITATION"
+                  ? `Verify sanitation crew ${nearestSanitation?.item.id ?? "crew"} deployment`
+                  : "Verify halt capacity and devotee rest area",
+              type:
+                type === "WATER" ? "WATER_TANKER" :
+                type === "MEDICAL" ? "MEDICAL" :
+                type === "FOOD" ? "FOOD_SUPPLY" :
+                type === "SANITATION" ? "SANITATION" : "HALT",
               etaMinutes,
               status: "ASSIGNED",
               createdAt: timeString,
@@ -495,14 +532,27 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
           ...prev,
           tankers: prev.tankers.map((tanker) =>
             type === "WATER" && (tanker.id === matchingTankerId || (!matchingTankerId && tanker.status === "AVAILABLE"))
-              ? {
-                  ...tanker,
-                  status: "EN_ROUTE" as const,
-                  assignedCampId: nearestCamp?.item.name ?? "Live Dindi Location",
-                  etaMinutes,
-                }
+              ? { ...tanker, status: "EN_ROUTE" as const, assignedCampId: nearestCamp?.item.name ?? "Live Dindi Location", etaMinutes }
               : tanker
           ),
+          foodSupplies: prev.foodSupplies?.map((food) =>
+            type === "FOOD" && (food.id === nearestFood?.item.id || (!nearestFood && food.status === "AVAILABLE"))
+              ? { ...food, status: "EN_ROUTE" as const, assignedCampId: nearestCamp?.item.name ?? "Live Dindi Location", etaMinutes }
+              : food
+          ),
+          sanitationCrews: prev.sanitationCrews.map((crew) =>
+            type === "SANITATION" && (crew.id === nearestSanitation?.item.id || (!nearestSanitation && crew.status === "AVAILABLE"))
+              ? { ...crew, status: "EN_ROUTE" as const, assignedCampId: nearestCamp?.item.name ?? "Live Dindi Location", etaMinutes }
+              : crew
+          ),
+          camps: prev.camps.map((camp) => {
+            if (camp.id !== nearestCamp?.item.id) return camp;
+            return {
+              ...camp,
+              waterStockPercent: type === "WATER" ? Math.max(camp.waterStockPercent - 25, 10) : camp.waterStockPercent,
+              foodStockPercent: type === "FOOD" ? Math.max(camp.foodStockPercent - 25, 10) : camp.foodStockPercent,
+            };
+          }),
           volunteers: prev.volunteers.map((volunteer) =>
             volunteer.id === assignedVolunteer?.item.id
               ? {
@@ -512,8 +562,12 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
                     type === "WATER"
                       ? `Verify ${nearestTanker?.item.id ?? "water tanker"} arrival at ${nearestCamp?.item.name ?? "leader GPS"} (ETA ${etaMinutes} min)`
                       : type === "MEDICAL"
-                        ? `Support medical response at ${nearestMedical?.item.name ?? "leader GPS"} (ETA ${etaMinutes} min)`
-                        : `Confirm halt routing at ${nearestCamp?.item.name ?? "nearest halt"} (ETA ${etaMinutes} min)`,
+                      ? `Support medical response at ${nearestMedical?.item.name ?? "leader GPS"} (ETA ${etaMinutes} min)`
+                      : type === "FOOD"
+                      ? `Verify food unit ${nearestFood?.item.id ?? "kitchen"} at ${nearestCamp?.item.name ?? "leader GPS"} (ETA ${etaMinutes} min)`
+                      : type === "SANITATION"
+                      ? `Verify sanitation crew at ${nearestCamp?.item.name ?? "leader GPS"} (ETA ${etaMinutes} min)`
+                      : `Confirm halt routing at ${nearestCamp?.item.name ?? "nearest halt"} (ETA ${etaMinutes} min)`,
                 }
               : volunteer,
           ),
@@ -562,11 +616,34 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
                 }
               : tanker
           ),
-          camps: prev.camps.map((camp) =>
-            task.type === "WATER_TANKER" && (camp.id === task.campId || camp.name === task.campName) && status === "VERIFIED"
-              ? { ...camp, waterStockPercent: 100, minutesToWaterDepletion: 480 }
-              : camp
+          foodSupplies: prev.foodSupplies?.map((food) =>
+            task.type === "FOOD_SUPPLY" && food.assignedCampId?.includes(task.campName || "")
+              ? {
+                  ...food,
+                  status: status === "VERIFIED" ? ("AVAILABLE" as const) : food.status,
+                  assignedCampId: status === "VERIFIED" ? undefined : food.assignedCampId,
+                }
+              : food
           ),
+          sanitationCrews: prev.sanitationCrews.map((crew) =>
+            task.type === "SANITATION" && crew.assignedCampId?.includes(task.campName || "")
+              ? {
+                  ...crew,
+                  status: status === "VERIFIED" ? ("AVAILABLE" as const) : crew.status,
+                  assignedCampId: status === "VERIFIED" ? undefined : crew.assignedCampId,
+                }
+              : crew
+          ),
+          camps: prev.camps.map((camp) => {
+            const isTargetCamp = camp.id === task.campId || camp.name === task.campName;
+            if (!isTargetCamp) return camp;
+            return {
+              ...camp,
+              waterStockPercent: task.type === "WATER_TANKER" && status === "VERIFIED" ? 100 : camp.waterStockPercent,
+              minutesToWaterDepletion: task.type === "WATER_TANKER" && status === "VERIFIED" ? 480 : camp.minutesToWaterDepletion,
+              foodStockPercent: task.type === "FOOD_SUPPLY" && status === "VERIFIED" ? 100 : camp.foodStockPercent,
+            };
+          }),
           volunteers: prev.volunteers.map((volunteer) =>
             volunteer.id === task.volunteerId && (status === "VERIFIED" || status === "REJECTED")
               ? { ...volunteer, status: "AVAILABLE" as const, currentTask: undefined }

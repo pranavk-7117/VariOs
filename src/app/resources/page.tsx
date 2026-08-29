@@ -340,81 +340,173 @@ export default function ResourcesPage() {
 
       {/* ── TAB 2: PRASAD & ANNA DAN KITCHENS (CAMPS 1-8) ── */}
       {resourceTab === "FOOD" && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-sm font-bold text-wari-textPrimary flex items-center gap-2">
               <Utensils className="w-4 h-4 text-amber-600" />
-              Anna Dan & Maha-Prasad Kitchens across Camps 1–8
+              Maha-Prasad & Anna Dan Infrastructure (Camps 1–8)
             </h2>
-            <span className="text-xs text-wari-textMuted">Prepared for ~250,000+ devotees daily</span>
+            <span className="text-xs text-amber-800 font-bold bg-amber-100 px-2.5 py-0.5 rounded-full">
+              {state.foodSupplies?.length || 6} Mobile Kitchens Ready
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {state.camps.map((c, idx) => (
-              <div
-                key={c.id}
-                className="card-base p-5 space-y-3 text-xs border border-amber-200 hover:border-amber-400 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm text-wari-textPrimary">{c.name}</span>
-                  <span className="text-amber-800 font-bold bg-amber-100 px-2 py-0.5 rounded-full text-[10px]">
-                    {c.foodStockPercent}% Stock
-                  </span>
-                </div>
-                <div className="w-full bg-wari-pageBg h-2.5 rounded-full overflow-hidden border border-wari-cardBorder">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Camps Food Stock (7 Cols) */}
+            <div className="lg:col-span-7 card-base p-6 space-y-4">
+              <h3 className="text-sm font-bold text-wari-textPrimary uppercase tracking-wider pb-2 border-b border-wari-cardBorder flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-amber-600" />
+                Camp Food Reserves (Camps 1–8)
+              </h3>
+              <div className="space-y-3">
+                {state.camps.map((c) => (
                   <div
-                    className="h-full bg-amber-500 rounded-full"
-                    style={{ width: `${c.foodStockPercent}%` }}
-                  />
-                </div>
-                <div className="space-y-1 text-wari-textSecond">
-                  <div>
-                    <span className="text-wari-textMuted">Safe Capacity: </span>
-                    <strong>{c.capacity.toLocaleString()} pilgrims</strong>
+                    key={c.id}
+                    className="p-4 rounded-xl bg-wari-pageBg border border-wari-cardBorder text-xs space-y-2.5 hover:border-amber-300 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-sm text-wari-textPrimary">{c.name}</span>
+                        <div className="text-[11px] text-wari-textMuted">
+                          Safe Devotee Capacity: {c.capacity.toLocaleString()} • Status: {c.shelterStatus}
+                        </div>
+                      </div>
+                      <span
+                        className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                          c.foodStockPercent <= 25
+                            ? "bg-red-100 text-red-700 border border-red-200 animate-pulse"
+                            : c.foodStockPercent <= 50
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-emerald-100 text-emerald-800"
+                        }`}
+                      >
+                        {c.foodStockPercent}% Food Stock
+                      </span>
+                    </div>
+
+                    <div className="w-full bg-white h-2.5 rounded-full overflow-hidden border border-wari-cardBorder">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${
+                          c.foodStockPercent <= 25
+                            ? "bg-red-500"
+                            : c.foodStockPercent <= 50
+                            ? "bg-amber-500"
+                            : "bg-emerald-500"
+                        }`}
+                        style={{ width: `${c.foodStockPercent}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-wari-textMuted">
+                      <span>Devotees Present: {c.currentOccupancy.toLocaleString()}</span>
+                      <span className="text-emerald-700 font-semibold">Hot Khichdi, Sheera & Meals Ready</span>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-wari-textMuted">
-                    Maha-Prasad kitchen active. Hot khichdi, sheera & clean drinking water ready.
-                  </p>
-                </div>
+                ))}
               </div>
-            ))}
+            </div>
+
+            {/* Mobile Food Trucks Fleet (5 Cols) */}
+            <div className="lg:col-span-5 card-base p-6 space-y-4">
+              <h3 className="text-sm font-bold text-wari-textPrimary uppercase tracking-wider pb-2 border-b border-wari-cardBorder flex items-center gap-2">
+                <Truck className="w-4 h-4 text-amber-600" />
+                Mobile Anna Dan Food Fleet ({state.foodSupplies?.length || 6} Units)
+              </h3>
+              <div className="space-y-3">
+                {state.foodSupplies?.map((f) => (
+                  <div
+                    key={f.id}
+                    className="p-4 rounded-xl bg-wari-pageBg border border-wari-cardBorder text-xs space-y-2 hover:border-amber-300 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Utensils className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span className="font-bold text-sm text-wari-textPrimary">{f.name}</span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                          f.status === "AVAILABLE"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-blue-100 text-blue-800 animate-pulse"
+                        }`}
+                      >
+                        {f.status}
+                      </span>
+                    </div>
+                    <div className="text-xs text-wari-textSecond space-y-1">
+                      <div>
+                        <span className="text-wari-textMuted">Vehicle / Hub: </span>
+                        <strong>{f.vehicleNumber}</strong> • {f.currentHub}
+                      </div>
+                      <div>
+                        <span className="text-wari-textMuted">Seva Trust / Contact: </span>
+                        <span>{f.leadName} ({f.phone})</span>
+                      </div>
+                      <div>
+                        <span className="text-wari-textMuted">Batch Capacity: </span>
+                        <strong className="text-amber-800">{f.mealsCapacity.toLocaleString()} meals</strong>
+                      </div>
+                      {f.assignedCampId && (
+                        <div className="text-emerald-700 font-semibold">
+                          Assigned: {f.assignedCampId} (ETA ~{f.etaMinutes}m)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       {/* ── TAB 3: SANITATION CREWS & MOBILE PODS ── */}
       {resourceTab === "SANITATION" && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-sm font-bold text-wari-textPrimary flex items-center gap-2">
               <Trash2 className="w-4 h-4 text-teal-600" />
-              Corridor Sanitation Crews & Mobile Toilet Pods
+              Corridor Sanitation Crews & Mobile Bio-Toilet Squads
             </h2>
             <span className="text-xs text-teal-800 font-bold bg-teal-100 px-2.5 py-0.5 rounded-full">
-              {state.sanitationCrews.length} Crews Active
+              {state.sanitationCrews.length} Units Active
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {state.sanitationCrews.map((sc) => (
               <div
                 key={sc.id}
-                className="card-base p-5 space-y-2.5 text-xs border border-teal-200 hover:border-teal-400 transition-colors"
+                className="card-base p-5 space-y-3 text-xs border border-teal-200 hover:border-teal-400 transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <Trash2 className="w-4 h-4 text-teal-600" />
+                    <Trash2 className="w-4 h-4 text-teal-600 shrink-0" />
                     <span className="font-bold text-sm text-wari-textPrimary">{sc.name}</span>
                   </div>
-                  <span className="px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 text-xs font-semibold">
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      sc.status === "AVAILABLE"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-blue-100 text-blue-800 animate-pulse"
+                    }`}
+                  >
                     {sc.status}
                   </span>
                 </div>
-                <p className="text-xs text-wari-textSecond">
-                  Zone: <strong>{sc.zone}</strong> • Supervisor: <strong>{sc.leadName}</strong>
-                </p>
+
+                <div className="space-y-1 text-wari-textSecond">
+                  <p>Zone: <strong>{sc.zone}</strong></p>
+                  <p>Lead: <strong>{sc.leadName}</strong> {sc.phone ? `(${sc.phone})` : ""}</p>
+                  <p>Mobile Bio-Pods: <strong className="text-teal-800">{sc.mobilePodsCount || 20} Units</strong></p>
+                  {sc.assignedCampId && (
+                    <p className="text-emerald-700 font-bold">
+                      Dispatched To: {sc.assignedCampId} (ETA ~{sc.etaMinutes || 10}m)
+                    </p>
+                  )}
+                </div>
+
                 <div className="text-teal-900 text-xs font-semibold bg-teal-50 border border-teal-200 p-2.5 rounded-xl">
-                  ✓ {sc.activeToiletsCleaned} Mobile sanitation pods disinfected & sanitized in the last hour
+                  ✓ {sc.activeToiletsCleaned} Mobile pods disinfected & active
                 </div>
               </div>
             ))}

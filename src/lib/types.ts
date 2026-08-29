@@ -97,6 +97,22 @@ export interface WaterTanker {
   targetLng?: number;
 }
 
+export interface FoodSupplyUnit {
+  id: string;
+  name: string;
+  mealsCapacity: number;
+  status: "AVAILABLE" | "EN_ROUTE" | "SERVING";
+  currentHub: string;
+  assignedCampId?: string;
+  distanceKm: number;
+  etaMinutes: number;
+  leadName: string;
+  phone: string;
+  vehicleNumber: string;
+  lat: number;
+  lng: number;
+}
+
 export type VolunteerSkill =
   | "MEDICAL"
   | "TRAFFIC"
@@ -127,7 +143,7 @@ export interface VolunteerTask {
   volunteerId: string;
   volunteerName: string;
   title: string;
-  type: "WATER_TANKER" | "MEDICAL" | "HALT" | "CROWD" | "SANITATION" | "GENERAL";
+  type: "WATER_TANKER" | "FOOD_SUPPLY" | "MEDICAL" | "HALT" | "CROWD" | "SANITATION" | "GENERAL";
   etaMinutes: number;
   status: "ASSIGNED" | "IN_PROGRESS" | "VERIFIED" | "REJECTED";
   remarks?: string;
@@ -152,10 +168,15 @@ export interface MedicalStation {
 export interface SanitationCrew {
   id: string;
   name: string;
-  status: "DISPATCHED" | "AVAILABLE" | "ON_DUTY";
+  status: "AVAILABLE" | "EN_ROUTE" | "ON_DUTY";
   leadName: string;
+  phone?: string;
   activeToiletsCleaned: number;
+  mobilePodsCount: number;
   zone: string;
+  assignedCampId?: string;
+  distanceKm?: number;
+  etaMinutes?: number;
   lat: number;
   lng: number;
 }
@@ -232,6 +253,7 @@ export interface SimulationState {
   dindis: Dindi[];
   camps: Camp[];
   tankers: WaterTanker[];
+  foodSupplies: FoodSupplyUnit[];
   volunteers: Volunteer[];
   medicalStations: MedicalStation[];
   sanitationCrews: SanitationCrew[];
@@ -243,7 +265,6 @@ export interface SimulationState {
   isMitigated: boolean;
   showBeforeAfterModal: boolean;
   beforeAfterSummary: BeforeAfterMetric[] | null;
-
 }
 
 export interface CopilotMessage {
@@ -251,28 +272,13 @@ export interface CopilotMessage {
   sender: "USER" | "WARIOS_AI";
   timestamp: string;
   text?: string;
-  structuredPayload?: {
-    situation: string;
-    forecast: {
-      headline: string;
-      horizonMinutes: number;
-      breachCapacityPercent: number;
-    };
+  structured?: {
+    headline: string;
+    forecastText: string;
     rootCauses: string[];
-    cascadingImpact: { label: string; value: string }[];
-    recommendedActions: {
-      id: string;
-      title: string;
-      actionKey: string;
-      impactDescription: string;
-    }[];
-    confidencePercent: number;
-    isSimulatedForecast: boolean;
+    impacts: { label: string; value: string }[];
+    recommendations: string[];
+    confidence: number;
+    showCounterfactual?: boolean;
   };
-  counterfactualData?: {
-    metricName: string;
-    noActionVal: string | number;
-    wariosVal: string | number;
-    divergenceTimeline: { minute: number; noAction: number; warios: number }[];
-  }[];
 }

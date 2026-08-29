@@ -32,7 +32,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useLiveGps } from "@/context/LiveGpsContext";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { LiveRouteMapSnippet } from "@/components/dashboard/LiveRouteMapSnippet";
-import { getDistanceKm, getLiveCrowdClusters } from "@/lib/live-ops";
+import { getDistanceKm, getLiveCrowdClusters, computeDindiSyncPlan } from "@/lib/live-ops";
 import { VolunteerTask } from "@/lib/types";
 
 const copy = {
@@ -261,6 +261,7 @@ export default function CommandCentre() {
     assignCommandTask,
     deleteVolunteerTask,
     resetAll,
+    staggerDindiRoutes,
   } = useSimulation();
   const { language } = useLanguage();
   const { coords } = useLiveGps();
@@ -311,6 +312,7 @@ export default function CommandCentre() {
   const criticalAlerts = activeAlerts.filter((alert) => alert.severity === "CRITICAL");
   const availableVolunteers = state.volunteers.filter((volunteer) => volunteer.status === "AVAILABLE").length;
   const availableTankers = state.tankers.filter((tanker) => tanker.status === "AVAILABLE").length;
+  const syncPlan = computeDindiSyncPlan(state.dindis, state.camps);
 
   const medicalCapacity =
     state.medicalStations.length > 0
@@ -823,6 +825,72 @@ export default function CommandCentre() {
               </div>
             )}
           </div>
+
+          {/* DINDI SYNCHRONIZATION & DYNAMIC ROUTE STAGGERING DISPATCH BANNER */}
+          {syncPlan && (
+            <div className="rounded-3xl border-2 border-purple-300 bg-gradient-to-r from-purple-50 via-indigo-50 to-white p-5 shadow-card space-y-3 animate-fadeIn">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-purple-200/80">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">⚡</span>
+                    <h3 className="font-extrabold text-sm text-purple-950">
+                      {language === "mr"
+                        ? "दिंडी सिंक्रोनायझेशन आणि डायनॅमिक हॉल्ट प्लॅनिंग"
+                        : language === "hi"
+                        ? "दिंडी सिंक्रोनाइज़ेशन और डायनेमिक रूट स्टैगरिंग"
+                        : "Dindi Synchronization & Dynamic Route Staggering"}
+                    </h3>
+                    <span className="text-[10px] font-bold bg-purple-200 text-purple-900 px-2 py-0.5 rounded-full uppercase">
+                      Logistics Optimization
+                    </span>
+                  </div>
+                  <p className="text-xs text-purple-900 mt-0.5">
+                    {language === "mr"
+                      ? `${syncPlan.targetCamp.name} येथे एकाच वेळी गर्दीचा धोका टाळण्यासाठी दिंडींना थेट व बायपास मार्गावर विभागून +${syncPlan.staggerDeltaMinutes} मिनिटांचे आगमन अंतर निश्चित करा.`
+                      : language === "hi"
+                      ? `${syncPlan.targetCamp.name} पर एक साथ भीड़ का टकराव रोकने के लिए दिंडियों को सीधे व बाईपास मार्ग पर विभाजित कर +${syncPlan.staggerDeltaMinutes} मिनट का अंतराल बनाएं।`
+                      : `Prevent simultaneous collision at ${syncPlan.targetCamp.name} by splitting Dindis into Shortest & Bypass Corridors (+${syncPlan.staggerDeltaMinutes}m stagger gap).`}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => staggerDindiRoutes(syncPlan.targetCamp.id)}
+                  className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 shrink-0 self-start sm:self-auto"
+                >
+                  <span>⚡</span>
+                  <span>
+                    {language === "mr"
+                      ? "स्टॅगर्ड मार्ग प्रेषित करा"
+                      : language === "hi"
+                      ? "स्टैगर्ड रूट लागू करें"
+                      : "Apply Staggered Routes"}
+                  </span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3 bg-white/90 rounded-xl border border-emerald-200 space-y-1">
+                  <div className="flex items-center justify-between font-bold text-emerald-950 text-[11px]">
+                    <span>{syncPlan.dindiShortRoute.dindi.name} (Shortest Route)</span>
+                    <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-mono">Batch 1 · {syncPlan.dindiShortRoute.arrivalWindow}</span>
+                  </div>
+                  <p className="text-[10px] text-emerald-800">
+                    Route: {syncPlan.dindiShortRoute.routeName} ({syncPlan.dindiShortRoute.distanceKm} km, {syncPlan.dindiShortRoute.paceKmH} km/h).
+                  </p>
+                </div>
+
+                <div className="p-3 bg-white/90 rounded-xl border border-purple-200 space-y-1">
+                  <div className="flex items-center justify-between font-bold text-purple-950 text-[11px]">
+                    <span>{syncPlan.dindiLongRoute.dindi.name} (Scenic Bypass)</span>
+                    <span className="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded font-mono">Batch 2 · {syncPlan.dindiLongRoute.arrivalWindow}</span>
+                  </div>
+                  <p className="text-[10px] text-purple-800">
+                    Route: {syncPlan.dindiLongRoute.routeName} ({syncPlan.dindiLongRoute.distanceKm} km, {syncPlan.dindiLongRoute.paceKmH} km/h).
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* LIVE TACTICAL ROUTE MAP */}
           <div className="rounded-3xl bg-white/90 border border-orange-100 p-5 shadow-card space-y-3">

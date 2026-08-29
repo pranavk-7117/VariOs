@@ -148,6 +148,32 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
           </span>
         </div>
 
+        {/* Replanned Route Alert Banner for Dindi Leader */}
+        {activeDindi?.route && (
+          <div className="p-4 rounded-xl border-2 border-purple-400 bg-gradient-to-r from-purple-50 via-indigo-50 to-white text-xs space-y-2 shadow-sm animate-fadeIn">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Navigation className="w-4 h-4 text-purple-700 animate-pulse" />
+                <span className="font-extrabold text-purple-950 text-xs">
+                  ⚡ Route Replanned by AI Command Centre
+                </span>
+              </div>
+              <span className="text-[10px] font-bold bg-purple-200 text-purple-900 px-2 py-0.5 rounded-full">
+                DYNAMIC HALT SYNC
+              </span>
+            </div>
+            <p className="text-purple-900 text-[11px] leading-relaxed">
+              Your Dindi has been dynamically assigned to: <strong>{activeDindi.route}</strong>.
+            </p>
+            <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-purple-200/80 text-[10px] text-purple-800">
+              <span>🚶 Recommended Pace: <strong>{activeDindi.speedKmH ?? 3.5} km/h</strong></span>
+              <span>📍 Destination Halt: <strong>{activeDindi.nextHalt ?? "Camp 1"}</strong></span>
+              <span>⏱️ Batch Arrival: <strong>{activeDindi.etaNextHalt ?? "On Schedule"}</strong></span>
+              <span className="text-emerald-700 font-bold">✓ Food &amp; Water stations staged along this route</span>
+            </div>
+          </div>
+        )}
+
         {/* Confirmation Toast */}
         {requestSent && (
           <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center gap-2.5 text-xs text-emerald-800 animate-fadeIn">

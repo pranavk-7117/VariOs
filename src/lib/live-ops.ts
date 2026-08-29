@@ -163,3 +163,138 @@ export function formatLiveClusterAnswer(cluster: LiveCrowdCluster): {
     ],
   };
 }
+
+export interface DindiSyncPlan {
+  targetCamp: Camp;
+  convergingDindis: Dindi[];
+  totalPilgrims: number;
+  dindiShortRoute: {
+    dindi: Dindi;
+    routeName: string;
+    routeType: "SHORTEST_PRIMARY" | "MAIN_CORRIDOR";
+    distanceKm: number;
+    paceKmH: number;
+    etaMinutes: number;
+    arrivalWindow: string;
+    departureWindow: string;
+    actionNote: string;
+  };
+  dindiLongRoute: {
+    dindi: Dindi;
+    routeName: string;
+    routeType: "STAGGERED_BYPASS" | "SCENIC_OUTER";
+    distanceKm: number;
+    paceKmH: number;
+    etaMinutes: number;
+    arrivalWindow: string;
+    departureWindow: string;
+    actionNote: string;
+  };
+  staggerDeltaMinutes: number;
+  campPeakOccupancyBefore: number;
+  campPeakOccupancyAfter: number;
+  advanceAlerts: {
+    department: "FOOD_PRASAD" | "WATER_TANKER" | "SANITATION" | "VOLUNTEER_MARSHAL";
+    scheduledTime: string;
+    action: string;
+    targetBatch: string;
+  }[];
+}
+
+export function computeDindiSyncPlan(
+  dindis: Dindi[],
+  camps: Camp[],
+  targetCampId?: string
+): DindiSyncPlan | null {
+  const registered = dindis.filter((d) => d.isCustomRegistered);
+  if (registered.length < 2) return null;
+
+  const targetCamp =
+    camps.find((c) => c.id === targetCampId) ??
+    camps.find((c) => c.occupancyPercent >= 90) ??
+    camps[0];
+
+  const sortedByCount = [...registered].sort((a, b) => b.pilgrimCount - a.pilgrimCount);
+  const dindiA = sortedByCount[0];
+  const dindiB = sortedByCount[1];
+
+  const baseDistKm = nearest(dindiA.lat, dindiA.lng, camps)?.distanceKm ?? 4.2;
+  const shortDistKm = Math.max(3.2, Math.round(baseDistKm * 10) / 10);
+  const longDistKm = Math.round((shortDistKm + 3.4) * 10) / 10;
+
+  const paceA = dindiA.speedKmH && dindiA.speedKmH > 1 ? dindiA.speedKmH : (dindiA.currentPaceKmH || 3.8);
+  const paceB = dindiB.speedKmH && dindiB.speedKmH > 1 ? dindiB.speedKmH : 3.2; // Slightly slowed for pacing
+
+  const etaShortMin = Math.round((shortDistKm / paceA) * 60);
+  const etaLongMin = Math.round((longDistKm / paceB) * 60);
+  const staggerDelta = Math.max(35, etaLongMin - etaShortMin);
+
+  const totalPilgrims = dindiA.pilgrimCount + dindiB.pilgrimCount;
+  const campCapacity = targetCamp.capacity || 40000;
+  const peakBeforePct = Math.round((totalPilgrims / campCapacity) * 100);
+  const peakAfterPct = Math.round((Math.max(dindiA.pilgrimCount, dindiB.pilgrimCount) / campCapacity) * 100);
+
+  return {
+    targetCamp,
+    convergingDindis: [dindiA, dindiB],
+    totalPilgrims,
+    dindiShortRoute: {
+      dindi: dindiA,
+      routeName: "Primary Express Corridor (NH-965 Direct)",
+      routeType: "SHORTEST_PRIMARY",
+      distanceKm: shortDistKm,
+      paceKmH: paceA,
+      etaMinutes: etaShortMin,
+      arrivalWindow: `+${etaShortMin}m (Batch 1)`,
+      departureWindow: `+${etaShortMin + 50}m`,
+      actionNote: "Take direct route. Proceed to Camp 1 for immediate meal service & rest, then depart before Batch 2 arrives.",
+    },
+    dindiLongRoute: {
+      dindi: dindiB,
+      routeName: "Scenic Riverside Outer Bypass (Mutha Corridor)",
+      routeType: "STAGGERED_BYPASS",
+      distanceKm: longDistKm,
+      paceKmH: paceB,
+      etaMinutes: etaLongMin,
+      arrivalWindow: `+${etaLongMin}m (Batch 2 - +${staggerDelta}m Offset)`,
+      departureWindow: `+${etaLongMin + 50}m`,
+      actionNote: "Reroute to outer bypass (+3.4 km). Enjoy open shaded corridor. Arrive after Batch 1 departs with zero queuing.",
+    },
+    staggerDeltaMinutes: staggerDelta,
+    campPeakOccupancyBefore: peakBeforePct,
+    campPeakOccupancyAfter: peakAfterPct,
+    advanceAlerts: [
+      {
+        department: "FOOD_PRASAD",
+        scheduledTime: `T + ${Math.max(10, etaShortMin - 15)}m`,
+        action: `Prepare Batch 1 Maha-Prasad (${dindiA.pilgrimCount.toLocaleString()} meals) for ${dindiA.name}.`,
+        targetBatch: "Batch 1",
+      },
+      {
+        department: "WATER_TANKER",
+        scheduledTime: `T + ${Math.max(10, etaShortMin - 10)}m`,
+        action: "Connect Primary Tanker T-01 for Batch 1 hydration stations.",
+        targetBatch: "Batch 1",
+      },
+      {
+        department: "FOOD_PRASAD",
+        scheduledTime: `T + ${Math.max(20, etaLongMin - 15)}m`,
+        action: `Prepare Fresh Batch 2 Maha-Prasad (${dindiB.pilgrimCount.toLocaleString()} meals) for ${dindiB.name}.`,
+        targetBatch: "Batch 2",
+      },
+      {
+        department: "SANITATION",
+        scheduledTime: `T + ${etaShortMin + 45}m`,
+        action: "Rapid disinfection & bio-pod cleanout during 15-minute inter-batch turnover gap.",
+        targetBatch: "Inter-batch Gap",
+      },
+      {
+        department: "VOLUNTEER_MARSHAL",
+        scheduledTime: `T + ${etaShortMin + 50}m`,
+        action: `Guide ${dindiA.name} to exit lane towards next stage corridor to clear space for incoming ${dindiB.name}.`,
+        targetBatch: "Handover",
+      },
+    ],
+  };
+}
+

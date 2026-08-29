@@ -149,6 +149,24 @@ export default function DindiPortal() {
                 </div>
               </div>
 
+              {/* Replanned Route Notification */}
+              {d.route && (
+                <div className="p-2.5 rounded-lg bg-purple-100/80 border border-purple-300 text-xs space-y-1">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-purple-950">
+                    <span className="flex items-center gap-1">
+                      <span>⚡</span>
+                      <span>Assigned Route: {d.route}</span>
+                    </span>
+                    <span className="bg-purple-200 text-purple-900 px-1.5 py-0.2 rounded text-[10px]">
+                      Staggered Batch
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-purple-800">
+                    Pace: {d.speedKmH ?? d.currentPaceKmH} km/h • Optimized to ensure zero halt overcrowding.
+                  </p>
+                </div>
+              )}
+
               {/* Live GPS linked to this dindi */}
               <div className="grid grid-cols-3 gap-2 text-xs">
                 <div className="bg-white rounded-lg p-2.5 border border-orange-100">

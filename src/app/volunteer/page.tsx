@@ -154,6 +154,42 @@ export default function VolunteerPortal() {
         </div>
       </div>
 
+      {/* ── DYNAMIC ROUTE STAGGERING MARSHALING ADVISORY ── */}
+      {realDindis.some((d) => d.route) && (
+        <div className="rounded-2xl border-2 border-purple-300 bg-gradient-to-r from-purple-50 via-indigo-50 to-white p-4 space-y-2 shadow-sm animate-fadeIn">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-base">📢</span>
+              <h3 className="text-xs font-bold text-purple-950 uppercase tracking-tight">
+                Command Centre Dispatch: Dindi Route Replanning Active
+              </h3>
+            </div>
+            <span className="text-[10px] font-bold bg-purple-200 text-purple-900 px-2 py-0.5 rounded-full">
+              CORRIDOR SYNC
+            </span>
+          </div>
+          <p className="text-xs text-purple-900 leading-relaxed">
+            Dynamic route dispersion has been executed to stagger arrival times. Volunteers are stationed at bifurcation points to guide Dindis along their designated marshaling corridors.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-purple-200/70 text-xs">
+            {realDindis.filter((d) => d.route).map((d) => (
+              <div key={d.id} className="p-2.5 rounded-xl bg-white/90 border border-purple-200 space-y-0.5">
+                <div className="font-bold text-purple-950 flex items-center justify-between">
+                  <span>{d.name}</span>
+                  <span className="text-[10px] text-purple-700 font-mono">Pace {d.speedKmH ?? d.currentPaceKmH} km/h</span>
+                </div>
+                <div className="text-[11px] text-purple-900 font-medium">
+                  Route: <strong>{d.route}</strong>
+                </div>
+                <div className="text-[10px] text-purple-700">
+                  Target Halt: {d.nextHalt} (ETA {d.etaNextHalt})
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── TAB NAVIGATION ── */}
       <div className="flex gap-2 bg-wari-pageBg p-1 rounded-xl border border-wari-cardBorder">
         {[
@@ -424,9 +460,18 @@ export default function VolunteerPortal() {
                       {d.passcode}
                     </span>
                   </div>
+                  {d.route && (
+                    <div className="p-2 bg-purple-100 rounded-lg border border-purple-200 text-xs">
+                      <span className="text-purple-900 font-bold">⚡ Assigned Route: </span>
+                      <span className="text-purple-800 font-semibold">{d.route}</span>
+                      <span className="text-purple-600 block text-[10px] mt-0.5">
+                        Target Halt: {d.nextHalt} • ETA: {d.etaNextHalt} • Speed: {d.speedKmH ?? d.currentPaceKmH} km/h
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-4 text-xs pt-2 border-t border-orange-200">
                     <span>👥 <strong>{d.pilgrimCount.toLocaleString()} devotees</strong></span>
-                    <span>⚡ <strong className="text-emerald-700">{d.currentPaceKmH} km/h</strong></span>
+                    <span>⚡ <strong className="text-emerald-700">{d.speedKmH ?? d.currentPaceKmH} km/h</strong></span>
                     <span>📍 <strong>{d.lat.toFixed(4)}°N, {d.lng.toFixed(4)}°E</strong></span>
                   </div>
                 </div>

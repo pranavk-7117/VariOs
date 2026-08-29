@@ -204,8 +204,78 @@ export default function CopilotPage() {
 
     let aiMsg: MessageItem;
 
-    // ── 1. SANITATION / TOILET / WASHROOM INTENT ──
+    // ── 0. DINDI SYNCHRONIZATION & DYNAMIC HALT PLANNING / MULTIPLE ROUTE STAGGERING INTENT ──
     if (
+      /sync|stagger|dynamic\s*halt|multiple\s*route|route\s*sync|synchroniz|phased|longer\s*route|shortest\s*route|split\s*route|alternate\s*route|staggered|bypass\s*route|दोन्ही\s*दिंडी|मार्ग|वेळापत्रक|सिंक्रो|अलग\s*मार्ग|छोटा\s*मार्ग|लांब\s*मार्ग|रास्ता|रूट/.test(
+        qLower
+      )
+    ) {
+      let headline = "";
+      let forecastText = "";
+      let impacts: { label: string; value: string }[] = [];
+      let recommendations: string[] = [];
+
+      if (targetLang === "mr") {
+        headline = "दिंडी सिंक्रोनायझेशन आणि डायनॅमिक हॉल्ट प्लॅनिंग (लॉजिस्टिक ऑप्टिमायझेशन)";
+        forecastText = `दिंडी सिंक्रोनायझेशन व बहु-मार्ग (Multiple Routes) नियोजन:\n\n१. ट्रॅक (Track): दोन्ही दिंड्यांच्या थेट GPS स्थानावर रिअल-टाइम लक्ष ठेवले जाते.\n\n२. अंदाज (Predict): दोन्ही दिंड्या एकाच वेळी तळ १ (पुणे भवानी पेठ) येथे पोहोचल्यास तळाची क्षमता २००% ओलांडून चेंगराचेंगरीचा धोका निर्माण होतो.\n\n३. पुनर्नियोजन (Re-plan - Route Staggering):\n   • दिंडी १ (थेट मार्ग - NH-965): ४.२ किमी, पोहोचण्याची वेळ: +४५ मिनिटे (बॅच १).\n   • दिंडी २ (निसर्गरम्य बाह्य बायपास - मुठा नदी मार्ग): ६.८ किमी, पोहोचण्याची वेळ: +९५ मिनिटे (बॅच २ - +५० मिनिटे अंतर).\n   • फायदा: दिंडी २ तळ १ वर पोहोचेल तोपर्यंत दिंडी १ महाप्रसाद व विश्रांती घेऊन पुढील मुक्कामाकडे मार्गस्थ होईल!\n\n४. पूर्वसूचना (Alert): तळ १ च्या अन्नदान किचन, पाणी टँकर आणि स्वच्छता पथकांना बॅच १ (१६:३०) आणि बॅच २ (१७:४५) नुसार आगाऊ संदेश पाठवला जातो.`;
+        impacts = [
+          { label: "तळ गर्दी भार", value: "२००% वरून ७०% सुरक्षित" },
+          { label: "आगमन अंतर", value: "+५० मिनिटे स्टॅगर" },
+          { label: "लॉजिस्टिक्स पूर्वतयारी", value: "१००% आगाऊ नियोजन" },
+        ];
+        recommendations = [
+          "दिंडी १ ला मुख्य कॉरिडॉर व दिंडी २ ला बाह्य बायपास मार्गावर वळवा.",
+          "अन्नदान स्वयंपाकघराला बॅच १ व बॅच २ नुसार ताजे जेवण तयार ठेवण्याची पूर्वसूचना द्या.",
+          "१५ मिनिटांच्या मधल्या वेळेत बायो-शौचालयांचे निर्जंतुकीकरण पूर्ण करा.",
+        ];
+      } else if (targetLang === "hi") {
+        headline = "दिंडी सिंक्रोनाइज़ेशन और डायनेमिक हॉल्ट प्लानिंग (लॉजिस्टिक्स अनुकूलन)";
+        forecastText = `दिंडी सिंक्रोनाइज़ेशन एवं बहु-मार्ग (Multiple Routes) रणनीति:\n\n1. ट्रैक (Track): दोनों दिंडियों के लाइव GPS स्थान की रीयल-टाइम ट्रैकिंग।\n\n2. पूर्वानुमान (Predict): दोनों दिंडियों के एक साथ शिविर 1 पर पहुंचने से 200% ओवरलोड और भीड़ का गंभीर खतरा।\n\n3. पुनर्नियोजन (Re-plan - Route Staggering):\n   • दिंडी 1 (प्रत्यक्ष मुख्य मार्ग - NH-965): 4.2 किमी, पहुंचने का समय: +45 मिनट (बैच 1)।\n   • दिंडी 2 (वैकल्पिक बाह्य बाईपास मार्ग): 6.8 किमी, पहुंचने का समय: +95 मिनट (बैच 2 - +50 मिनट का अंतराल)।\n   • परिणाम: जब तक दिंडी 2 शिविर 1 पहुंचेगी, तब तक दिंडी 1 भोजन व विश्राम कर आगे प्रस्थान कर चुकी होगी!\n\n4. अलर्ट (Alert): शिविर 1 की रसोई, पानी के टैंकर और सफाई कर्मियों को बैच-वार आगमन की पूर्व सूचना।`;
+        impacts = [
+          { label: "शिविर पीक लोड", value: "200% से घटकर 70% सुरक्षित" },
+          { label: "आगमन अंतराल", value: "+50 मिनट स्टैगर" },
+          { label: "लॉजिस्टिक्स तैयारी", value: "पूर्णतः स्वचालित" },
+        ];
+        recommendations = [
+          "दिंडी 1 को सबसे छोटे मार्ग पर और दिंडी 2 को लंबे बाईपास मार्ग पर निर्देशित करें।",
+          "रसोई दल को बैच 1 और बैच 2 के अनुसार गरम महाप्रसाद तैयार रखने का अलर्ट भेजें।",
+          "दोनों बैचों के बीच 15 मिनट के अंतराल में बायो-शौचालयों की सफाई करवाएं।",
+        ];
+      } else {
+        headline = "Dindi Synchronization & Dynamic Halt Planning (Logistics Optimization)";
+        forecastText = `Dindi Synchronization & Multi-Route Staggering Strategy:\n\n1. Track: Live GPS telemetry tracks both Dindis heading towards Camp 1.\n\n2. Predict: Simultaneous arrival causes a 200% peak capacity crush at Camp 1 entrance and kitchen facilities.\n\n3. Re-plan (Dynamic Route Staggering):\n   • Dindi 1 (Shortest Direct Corridor - NH-965): 4.2 km · ETA +45 min (Batch 1).\n   • Dindi 2 (Scenic Outer Bypass): 6.8 km · ETA +95 min (Batch 2 · +50 min offset).\n   • Optimization Result: By the time Dindi 2 arrives at Camp 1, Dindi 1 has finished Maha-Prasad and started moving to the next transit sector! Zero overcrowding, zero queueing.\n\n4. Alert: Kitchen, water tankers, and medical squads at Camp 1 receive scheduled alerts in advance for Batch 1 and Batch 2.`;
+        impacts = [
+          { label: "Camp Peak Load", value: "Reduced from 200% to 70%" },
+          { label: "Stagger Gap", value: "+50 Min Phased Window" },
+          { label: "Turnaround", value: "Zero Queueing Bottleneck" },
+        ];
+        recommendations = [
+          "1. Route Dindi 1 via Primary NH-965 Express and Dindi 2 via Riverside Scenic Bypass.",
+          "2. Alert Camp 1 Kitchen to stage Batch 1 Prasad at T+30m and Batch 2 at T+80m.",
+          "3. Perform 15-minute bio-toilet sanitization during the inter-batch turnover gap.",
+        ];
+      }
+
+      aiMsg = {
+        id: `ai-${Date.now()}`,
+        sender: "WARIOS_AI",
+        structured: {
+          headline,
+          forecastText,
+          rootCauses: [
+            "Static printed timetables create simultaneous bottleneck collisions at corridor camps.",
+            "Dynamic route dispersion staggers arrival times using natural distance deltas (+3.4 km bypass).",
+            "Camp capacity is never breached because previous batch departs before next batch arrives.",
+          ],
+          impacts,
+          recommendations,
+          confidence: 99,
+        },
+      };
+      speak(forecastText, targetLang);
+    }
+    // ── 1. SANITATION / TOILET / WASHROOM INTENT ──
+    else if (
       /toilet|toliet|tolet|washr|washrom|restroom|restrom|sanit|bathr|bathrom|sandaas|sandas|shauch|शौचालय|प्रसाधनगृह|संडास|स्वच्छता/.test(
         qLower
       )

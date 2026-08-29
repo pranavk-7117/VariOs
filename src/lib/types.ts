@@ -63,6 +63,9 @@ export interface Dindi {
   isCustomRegistered?: boolean;
   passcode?: string;
   routeColor: string;
+  speedKmH?: number;
+  route?: string;
+  reroutedCampId?: string;
 }
 
 export interface Camp {

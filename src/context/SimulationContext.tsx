@@ -23,7 +23,7 @@ import {
   executeDispatchAction,
   tickSimulationEngine,
 } from "@/lib/simulation-engine";
-import { getDistanceKm, getLiveCrowdClusters } from "@/lib/live-ops";
+import { getDistanceKm, getLiveCrowdClusters, computeDindiSyncPlan } from "@/lib/live-ops";
 import { clearLocalLiveDindis, deleteLiveDindi, loadLiveDindis, saveLiveDindis } from "@/lib/live-store";
 
 interface SimulationContextType {
@@ -74,6 +74,7 @@ interface SimulationContextType {
   rerouteLiveDindi: (dindiId: string, targetCampId: string) => void;
   openTemporaryAuxiliaryCamp: (baseCampId: string) => void;
   regulatePalkhiPace: (action: "THROTTLE_PACE" | "RELEASE_BATCH") => void;
+  staggerDindiRoutes: (targetCampId?: string) => void;
 }
 
 const SimulationContext = createContext<SimulationContextType | undefined>(undefined);
@@ -1329,6 +1330,104 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     }));
   }, []);
 
+  const staggerDindiRoutes = useCallback((targetCampId?: string) => {
+    const ts = new Date();
+    const timeString = `${ts.getHours().toString().padStart(2, "0")}:${ts.getMinutes().toString().padStart(2, "0")}:${ts.getSeconds().toString().padStart(2, "0")}`;
+    const nowId = Date.now();
+
+    setState((prev) => {
+      const plan = computeDindiSyncPlan(prev.dindis, prev.camps, targetCampId);
+      if (!plan) return prev;
+
+      const dindiA = plan.dindiShortRoute.dindi;
+      const dindiB = plan.dindiLongRoute.dindi;
+      const targetCampName = plan.targetCamp.name;
+
+      const updatedDindis = prev.dindis.map((d) => {
+        if (d.id === dindiA.id) {
+          return {
+            ...d,
+            route: plan.dindiShortRoute.routeName,
+            speedKmH: plan.dindiShortRoute.paceKmH,
+          };
+        }
+        if (d.id === dindiB.id) {
+          return {
+            ...d,
+            route: plan.dindiLongRoute.routeName,
+            speedKmH: plan.dindiLongRoute.paceKmH,
+          };
+        }
+        return d;
+      });
+
+      // Advance tasks for volunteer and kitchen teams
+      const newTasks: VolunteerTask[] = [
+        {
+          id: `TASK-SYNC-BATCH1-${nowId}`,
+          campId: plan.targetCamp.id,
+          campName: targetCampName,
+          volunteerId: "VOL-SYNC-01",
+          volunteerName: "Corridor Seva Desk",
+          title: `Prepare Batch 1 Arrival: ${dindiA.name} (~${dindiA.pilgrimCount.toLocaleString()} pilgrims via Direct Corridor, ETA ~${plan.dindiShortRoute.etaMinutes}m)`,
+          type: "FOOD_SUPPLY",
+          etaMinutes: plan.dindiShortRoute.etaMinutes,
+          status: "ASSIGNED",
+          remarks: "Fast turnaround required. Clear resting zone before Batch 2 arrives.",
+          createdAt: timeString,
+          updatedAt: timeString,
+        },
+        {
+          id: `TASK-SYNC-BATCH2-${nowId}`,
+          campId: plan.targetCamp.id,
+          campName: targetCampName,
+          volunteerId: "VOL-SYNC-02",
+          volunteerName: "Bypass Marshal Desk",
+          title: `Prepare Batch 2 Staggered Arrival: ${dindiB.name} (~${dindiB.pilgrimCount.toLocaleString()} pilgrims via Outer Bypass, ETA ~${plan.dindiLongRoute.etaMinutes}m)`,
+          type: "HALT",
+          etaMinutes: plan.dindiLongRoute.etaMinutes,
+          status: "ASSIGNED",
+          remarks: `Stagger gap of +${plan.staggerDeltaMinutes} min guarantees zero camp overcrowding.`,
+          createdAt: timeString,
+          updatedAt: timeString,
+        },
+      ];
+
+      const newAlert: Alert = {
+        id: `ALT-SYNC-${nowId}`,
+        title: `Dindi Synchronization Active: ${targetCampName}`,
+        location: targetCampName,
+        severity: "MEDIUM",
+        cause: `Dynamic route dispersion applied: ${dindiA.name} routed via Direct Corridor, ${dindiB.name} rerouted via Scenic Bypass (+${plan.staggerDeltaMinutes}m delay).`,
+        forecastText: `Camp peak load reduced from ${plan.campPeakOccupancyBefore}% down to ${plan.campPeakOccupancyAfter}%. Zero bottleneck risk.`,
+        recommendedAction: `Staggered batch schedule active. Kitchen & water logistics alerted.`,
+        timestamp: timeString,
+        status: "ACTIVE",
+        timeToCriticalMinutes: plan.staggerDeltaMinutes,
+        priorityScore: 50,
+        scoreBreakdown: { density: 10, urgency: 15, population: 15, resource: 10 },
+      };
+
+      return {
+        ...prev,
+        dindis: updatedDindis,
+        volunteerTasks: [...newTasks, ...prev.volunteerTasks],
+        alerts: [newAlert, ...prev.alerts],
+        events: [
+          {
+            id: `EV-SYNC-${nowId}`,
+            timestamp: timeString,
+            eventType: "DECISION" as const,
+            severity: "SUCCESS" as any,
+            source: "AI Dindi Synchronization Engine",
+            description: `Dynamic Halt Planning applied: ${dindiA.name} on Shortest Route (ETA +${plan.dindiShortRoute.etaMinutes}m), ${dindiB.name} on Scenic Bypass (ETA +${plan.dindiLongRoute.etaMinutes}m). Stagger gap: +${plan.staggerDeltaMinutes} min.`,
+          },
+          ...prev.events,
+        ],
+      };
+    });
+  }, []);
+
   return (
     <SimulationContext.Provider
       value={{
@@ -1358,6 +1457,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         rerouteLiveDindi,
         openTemporaryAuxiliaryCamp,
         regulatePalkhiPace,
+        staggerDindiRoutes,
       }}
     >
       {children}

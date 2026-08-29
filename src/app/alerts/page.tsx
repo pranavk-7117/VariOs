@@ -14,8 +14,71 @@ import { useLanguage } from "@/context/LanguageContext";
 
 export default function AlertsPage() {
   const { state, executeFullMitigation, isMitigated } = useSimulation();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [filterSeverity, setFilterSeverity] = useState<string>("ALL");
+
+  const pageCopy = {
+    en: {
+      title: "Alert Management Center",
+      subtitle: "Automated threshold alerts, predictive risk warnings, and instant mitigation controls",
+      filterAll: "ALL",
+      filterCritical: "CRITICAL",
+      filterHigh: "HIGH",
+      filterActive: "ACTIVE",
+      filterResolved: "RESOLVED",
+      location: "Location",
+      timestamp: "Timestamp",
+      priority: "Priority",
+      rootCause: "Root Cause:",
+      forecast: "45-Minute Forecast:",
+      recommended: "Recommended Action:",
+      executeMitigation: "Execute Mitigation",
+      mitigationInProgress: "Mitigation In Progress",
+    },
+    hi: {
+      title: "अलर्ट प्रबंधन केंद्र",
+      subtitle: "स्वचालित सीमा अलर्ट, पूर्वानुमान जोखिम चेतावनी और तत्काल शमन नियंत्रण",
+      filterAll: "सभी",
+      filterCritical: "गंभीर",
+      filterHigh: "उच्च",
+      filterActive: "सक्रिय",
+      filterResolved: "हल हुए",
+      location: "स्थान",
+      timestamp: "समय",
+      priority: "प्राथमिकता",
+      rootCause: "मूल कारण:",
+      forecast: "45 मिनट का पूर्वानुमान:",
+      recommended: "अनुशंसित कार्रवाई:",
+      executeMitigation: "शमन क्रियान्वित करें",
+      mitigationInProgress: "शमन प्रगति पर",
+    },
+    mr: {
+      title: "इशारा व्यवस्थापन केंद्र",
+      subtitle: "स्वयंचलित मर्यादा इशारे, अंदाजित धोका सूचना आणि त्वरित कृती नियंत्रण",
+      filterAll: "सर्व",
+      filterCritical: "गंभीर",
+      filterHigh: "उच्च",
+      filterActive: "सक्रिय",
+      filterResolved: "निराकरण झाले",
+      location: "स्थान",
+      timestamp: "वेळ",
+      priority: "प्राधान्य",
+      rootCause: "मूळ कारण:",
+      forecast: "४५ मिनिटांचा अंदाज:",
+      recommended: "शिफारस केलेली कृती:",
+      executeMitigation: "निवारण कृती करा",
+      mitigationInProgress: "निवारण सुरू आहे",
+    },
+  };
+  const pc = pageCopy[language] ?? pageCopy.en;
+
+  const filterLabels: Record<string, string> = {
+    ALL: pc.filterAll,
+    CRITICAL: pc.filterCritical,
+    HIGH: pc.filterHigh,
+    ACTIVE: pc.filterActive,
+    RESOLVED: pc.filterResolved,
+  };
 
   const filteredAlerts = state.alerts.filter((a) => {
     if (filterSeverity === "ALL") return true;
@@ -36,10 +99,10 @@ export default function AlertsPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-wari-textPrimary tracking-tight">
-              Alert Management Center
+              {pc.title}
             </h1>
             <p className="text-sm text-wari-textSecond mt-0.5">
-              Automated threshold alerts, predictive risk warnings, and instant mitigation controls
+              {pc.subtitle}
             </p>
           </div>
         </div>
@@ -56,7 +119,7 @@ export default function AlertsPage() {
                   : "text-wari-textSecond hover:text-wari-textPrimary"
               }`}
             >
-              {flt}
+              {filterLabels[flt] ?? flt}
             </button>
           ))}
         </div>
@@ -90,14 +153,14 @@ export default function AlertsPage() {
                     {alert.title}
                   </h3>
                   <span className="text-xs text-wari-textMuted">
-                    Location: {alert.location} • Timestamp: {alert.timestamp}
+                    {pc.location}: {alert.location} • {pc.timestamp}: {alert.timestamp}
                   </span>
                 </div>
               </div>
 
               <div className="flex items-center gap-3 text-xs">
                 <span className="px-3 py-1 rounded-full bg-white border border-wari-cardBorder text-wari-orange font-bold">
-                  Priority: {alert.priorityScore}/100
+                  {pc.priority}: {alert.priorityScore}/100
                 </span>
                 <span
                   className={`px-3 py-1 rounded-full font-bold ${
@@ -106,7 +169,7 @@ export default function AlertsPage() {
                       : "bg-emerald-100 text-emerald-800 border border-emerald-300"
                   }`}
                 >
-                  {alert.status}
+                  {alert.status === "ACTIVE" ? pc.filterActive : pc.filterResolved}
                 </span>
               </div>
             </div>
@@ -115,14 +178,14 @@ export default function AlertsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div className="bg-wari-pageBg p-4 rounded-xl border border-wari-cardBorder space-y-1">
                 <span className="text-wari-textMuted text-xs font-bold uppercase tracking-wider block">
-                  Root Cause:
+                  {pc.rootCause}
                 </span>
                 <p className="text-wari-textSecond leading-relaxed">{alert.cause}</p>
               </div>
 
               <div className="bg-wari-pageBg p-4 rounded-xl border border-wari-cardBorder space-y-1">
                 <span className="text-wari-textMuted text-xs font-bold uppercase tracking-wider block">
-                  45-Minute Forecast:
+                  {pc.forecast}
                 </span>
                 <p className="text-wari-textSecond leading-relaxed">{alert.forecastText}</p>
               </div>
@@ -131,7 +194,7 @@ export default function AlertsPage() {
             {/* Recommendation & Action Button */}
             <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-wari-cardBorder text-xs">
               <div className="text-wari-textPrimary">
-                <span className="text-wari-orange font-bold">Recommended Action: </span>
+                <span className="text-wari-orange font-bold">{pc.recommended} </span>
                 <span className="text-wari-textSecond">{alert.recommendedAction}</span>
               </div>
 
@@ -141,12 +204,12 @@ export default function AlertsPage() {
                   className="btn-primary flex items-center gap-2 shrink-0"
                 >
                   <Zap className="w-4 h-4" />
-                  <span>Execute Mitigation</span>
+                  <span>{pc.executeMitigation}</span>
                 </button>
               ) : (
                 <div className="badge-normal flex items-center gap-2 px-4 py-2 shrink-0">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Mitigation In Progress</span>
+                  <span>{pc.mitigationInProgress}</span>
                 </div>
               )}
             </div>

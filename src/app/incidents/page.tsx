@@ -19,9 +19,11 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useSimulation } from "@/context/SimulationContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { PriorityGauge } from "@/components/common/PriorityGauge";
 import { DecisionFlowBar } from "@/components/dashboard/DecisionFlowBar";
-import { getLiveCrowdClusters } from "@/lib/live-ops";
+import { getLiveCrowdClusters, computeDindiSyncPlan } from "@/lib/live-ops";
+import { ArrowRight, CheckCircle, Navigation, ShieldCheck } from "lucide-react";
 
 export default function IncidentsPage() {
   const {
@@ -35,13 +37,16 @@ export default function IncidentsPage() {
     rerouteLiveDindi,
     openTemporaryAuxiliaryCamp,
     regulatePalkhiPace,
+    staggerDindiRoutes,
     isMitigated,
   } = useSimulation();
 
+  const { language } = useLanguage();
   const cp4 = state.checkpoints.find((c) => c.shortCode === "CP4");
   const camp6 = state.camps.find((c) => c.id === "CAMP-06");
   const dindi14 = state.dindis.find((d) => d.id === "DINDI-14");
   const liveClusters = getLiveCrowdClusters(state);
+  const syncPlan = computeDindiSyncPlan(state.dindis, state.camps);
 
   if (!state.isSimulating) {
     const isMitigatedLive = state.isMitigated || state.volunteerTasks.some((t) => t.id.startsWith("TASK-MIT"));
@@ -249,9 +254,152 @@ export default function IncidentsPage() {
                           <Clock className="w-3.5 h-3.5 text-amber-600" />
                           <span>Throttle March Pace (2.5 km/h / 45m Batch)</span>
                         </button>
+                        {syncPlan && (
+                          <button
+                            onClick={() => staggerDindiRoutes(targetCamp?.id)}
+                            className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 active:scale-95 shadow-sm"
+                          >
+                            <Navigation className="w-3.5 h-3.5 text-yellow-300" />
+                            <span>⚡ Stagger Dindi Routes (Split Short vs Bypass)</span>
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
+
+                  {/* Dynamic Dindi Synchronization & Halt Planning Feature Panel */}
+                  {syncPlan && (
+                    <div className="rounded-2xl border-2 border-purple-300 bg-gradient-to-br from-purple-50/80 via-white to-indigo-50/80 p-5 space-y-4 shadow-sm">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-200/80 pb-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <Navigation className="w-4 h-4 text-purple-700" />
+                            <h3 className="font-black text-sm text-purple-950 tracking-tight">
+                              Dindi Synchronization &amp; Dynamic Halt Planning
+                            </h3>
+                            <span className="text-[10px] font-bold bg-purple-200 text-purple-900 px-2 py-0.5 rounded-full uppercase">
+                              Logistics Optimization
+                            </span>
+                          </div>
+                          <p className="text-xs text-purple-900/80 mt-0.5">
+                            Transforms static printed timetables into dynamic, data-driven route scheduling with staggered arrival windows.
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={() => staggerDindiRoutes(targetCamp?.id)}
+                          className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs flex items-center gap-2 self-start sm:self-auto shadow-sm active:scale-95 shrink-0"
+                        >
+                          <Zap className="w-3.5 h-3.5 text-yellow-300" />
+                          <span>Apply Staggered Routes</span>
+                        </button>
+                      </div>
+
+                      {/* 4-Step Pipeline Bar: Track -> Predict -> Re-plan -> Alert */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+                        <div className="p-3 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-extrabold text-purple-900 text-[11px] uppercase tracking-wider">1. Track</span>
+                            <span className="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded font-mono font-bold">GPS Live</span>
+                          </div>
+                          <p className="text-[11px] text-wari-textSecond">
+                            Live telemetry tracks <strong>{syncPlan.convergingDindis[0].name}</strong> &amp; <strong>{syncPlan.convergingDindis[1].name}</strong> converging on {syncPlan.targetCamp.name}.
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-extrabold text-amber-900 text-[11px] uppercase tracking-wider">2. Predict</span>
+                            <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-mono font-bold">Risk {syncPlan.campPeakOccupancyBefore}%</span>
+                          </div>
+                          <p className="text-[11px] text-wari-textSecond">
+                            Simultaneous arrival would cause <strong>{syncPlan.campPeakOccupancyBefore}% overload</strong> and bottleneck at camp entrance.
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-extrabold text-indigo-900 text-[11px] uppercase tracking-wider">3. Re-plan</span>
+                            <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded font-mono font-bold">+{syncPlan.staggerDeltaMinutes}m Offset</span>
+                          </div>
+                          <p className="text-[11px] text-wari-textSecond">
+                            Reroutes Dindi 1 via <strong>Shortest Corridor</strong> and Dindi 2 via <strong>Scenic Outer Bypass</strong> to stagger arrivals.
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-extrabold text-emerald-900 text-[11px] uppercase tracking-wider">4. Alert</span>
+                            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-mono font-bold">Advance Prep</span>
+                          </div>
+                          <p className="text-[11px] text-wari-textSecond">
+                            Pre-notifies Maha-Prasad kitchen, water tankers &amp; sanitation crews with batch timing schedule.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Route Staggering Comparison Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                        <div className="p-3.5 bg-emerald-50/70 border border-emerald-300 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <CheckCircle className="w-4 h-4 text-emerald-600" />
+                              <strong className="text-xs text-emerald-950 font-black">
+                                {syncPlan.dindiShortRoute.dindi.name} (Shortest Route)
+                              </strong>
+                            </div>
+                            <span className="text-[10px] font-bold bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full">
+                              Batch 1 • {syncPlan.dindiShortRoute.arrivalWindow}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-emerald-900">
+                            <strong>Route:</strong> {syncPlan.dindiShortRoute.routeName} ({syncPlan.dindiShortRoute.distanceKm} km, {syncPlan.dindiShortRoute.paceKmH} km/h).
+                          </p>
+                          <p className="text-[11px] text-emerald-800 bg-white/80 p-2 rounded-lg border border-emerald-200">
+                            ✓ {syncPlan.dindiShortRoute.actionNote}
+                          </p>
+                        </div>
+
+                        <div className="p-3.5 bg-purple-50/70 border border-purple-300 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <Navigation className="w-4 h-4 text-purple-600" />
+                              <strong className="text-xs text-purple-950 font-black">
+                                {syncPlan.dindiLongRoute.dindi.name} (Scenic Bypass)
+                              </strong>
+                            </div>
+                            <span className="text-[10px] font-bold bg-purple-200 text-purple-900 px-2 py-0.5 rounded-full">
+                              Batch 2 • {syncPlan.dindiLongRoute.arrivalWindow}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-purple-900">
+                            <strong>Route:</strong> {syncPlan.dindiLongRoute.routeName} ({syncPlan.dindiLongRoute.distanceKm} km, {syncPlan.dindiLongRoute.paceKmH} km/h).
+                          </p>
+                          <p className="text-[11px] text-purple-800 bg-white/80 p-2 rounded-lg border border-purple-200">
+                            ✓ {syncPlan.dindiLongRoute.actionNote}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Advance Logistics Notification Schedule */}
+                      <div className="bg-white/90 rounded-xl p-3.5 border border-purple-200 space-y-2 text-xs">
+                        <span className="font-bold text-purple-950 block text-[11px] uppercase tracking-wider">
+                          📢 Advance Logistics Notification Schedule (Kitchen / Water / Sanitation)
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                          {syncPlan.advanceAlerts.slice(0, 3).map((al, idx) => (
+                            <div key={idx} className="p-2.5 rounded-lg bg-purple-50/60 border border-purple-100 space-y-1">
+                              <div className="flex items-center justify-between text-[10px] font-bold">
+                                <span className="text-purple-800">{al.targetBatch}</span>
+                                <span className="font-mono text-purple-600">{al.scheduledTime}</span>
+                              </div>
+                              <p className="text-[11px] text-wari-textPrimary font-medium">{al.action}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

@@ -206,7 +206,7 @@ export default function CopilotPage() {
 
     // ── 1. SANITATION / TOILET / WASHROOM INTENT ──
     if (
-      /toilet|toliet|washroom|restroom|sanitation|bathroom|sandaas|sandas|shauchalay|शौचालय|प्रसाधनगृह|संडास|स्वच्छता/.test(
+      /toilet|toliet|tolet|washr|washrom|restroom|restrom|sanit|bathr|bathrom|sandaas|sandas|shauch|शौचालय|प्रसाधनगृह|संडास|स्वच्छता/.test(
         qLower
       )
     ) {
@@ -279,7 +279,7 @@ export default function CopilotPage() {
     }
     // ── 2. FOOD / PRASAD / MEALS INTENT (CAMP-SPECIFIC & GENERAL) ──
     else if (
-      /food|prasad|prasadam|meal|meals|anna|annadan|jevan|bhojan|khana|भोजन|जेवण|प्रसाद|अन्नदान|महाप्रसाद|kitchen/.test(
+      /food|fod|prasad|prasdam|prasadam|meal|anna|annadan|jevan|bhojan|khana|kitch|भोजन|जेवण|प्रसाद|अन्नदान|महाप्रसाद|रसोई/.test(
         qLower
       )
     ) {
@@ -403,7 +403,7 @@ export default function CopilotPage() {
     }
     // ── 3. WATER TANKER INTENT ──
     else if (
-      /water|tanker|पानी|पाणी|टँकर|टैंकर|जल|tahn|paani|pani/.test(qLower)
+      /water|watr|tanker|tankr|tahn|paani|pani|jal|hydration|drink|प्यास|पानी|पाणी|टँकर|टैंकर|जल/.test(qLower)
     ) {
       const nearestTanker =
         state.tankers.find((t) => t.status === "AVAILABLE") || state.tankers[0];
@@ -476,7 +476,7 @@ export default function CopilotPage() {
     }
     // ── 4. HOSPITAL & MEDICAL INTENT ──
     else if (
-      /hospital|medical|doctor|ambulance|रुग्णालय|दवाखाना|अस्पताल|इलाज|डॉक्टर|रुग्ण|emergency|icu/.test(
+      /hosp|hosip|medic|doct|ambul|icu|clinic|emerg|aid|first.?aid|treatment|दवा|अस्प|रुग्ण|डॉक्टर|इलाज/.test(
         qLower
       )
     ) {

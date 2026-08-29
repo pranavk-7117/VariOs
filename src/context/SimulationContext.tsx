@@ -330,15 +330,29 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
             deltaText: "Nearest Teams Linked",
           },
         ],
-        alerts: prev.alerts.map((alert) =>
-          alert.status === "ACTIVE"
-            ? {
-                ...alert,
-                status: "MITIGATION_IN_PROGRESS" as const,
-                recommendedAction: `Mitigation started: move overflow toward ${nearestCamp}, alert ${nearestMedical}, and stage water from ${nearestTanker}.`,
-              }
-            : alert,
-        ),
+        alerts: prev.alerts.map((alert) => {
+          if (alert.status !== "ACTIVE") return alert;
+          const isFood = alert.title.includes("Food") || alert.cause.includes("Food") || alert.cause.includes("Prasad");
+          const isWater = alert.title.includes("Water") || alert.cause.includes("Water");
+          const isMedical = alert.title.includes("Medical") || alert.cause.includes("Medical");
+          const isSanitation = alert.title.includes("Sanitation") || alert.cause.includes("Sanitation") || alert.cause.includes("Toilet");
+
+          const action = isFood
+            ? `Mitigation in progress: Dispatched Mobile Anna Dan Kitchen truck with meal packets to ${alert.location}. Ground volunteer assigned for prasad distribution.`
+            : isWater
+            ? `Mitigation in progress: Dispatched Water Tanker (${nearestTanker}) to ${alert.location}. Volunteer assigned for tank refill verification.`
+            : isMedical
+            ? `Mitigation in progress: Alerted ${nearestMedical} and dispatched mobile ambulance with emergency medical doctor to ${alert.location}.`
+            : isSanitation
+            ? `Mitigation in progress: Dispatched Mobile Bio-Toilet sanitation squad with mobile pods to ${alert.location}.`
+            : `Mitigation in progress: Directed overflow toward ${nearestCamp}, alerted ${nearestMedical}, and staged water from ${nearestTanker}.`;
+
+          return {
+            ...alert,
+            status: "MITIGATION_IN_PROGRESS" as const,
+            recommendedAction: action,
+          };
+        }),
         events: [
           {
             id: `EV-LIVE-MITIGATION-${Date.now()}`,

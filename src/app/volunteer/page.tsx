@@ -34,7 +34,15 @@ export default function VolunteerPortal() {
   const [reportSuccess, setReportSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"tasks" | "report" | "dindis" | "team">("tasks");
   const [selectedCampId, setSelectedCampId] = useState<string>("ALL");
+  const [reportCampId, setReportCampId] = useState<string>("CAMP-01");
   const [remarksByTask, setRemarksByTask] = useState<Record<string, string>>({});
+
+  // Sync reportCampId when top filter changes to a specific camp
+  React.useEffect(() => {
+    if (selectedCampId !== "ALL") {
+      setReportCampId(selectedCampId);
+    }
+  }, [selectedCampId]);
 
   // Filter tasks by selected camp (or show all)
   const filteredTasks = state.volunteerTasks.filter((t) =>
@@ -44,16 +52,20 @@ export default function VolunteerPortal() {
   // Real registered Dindis
   const realDindis = state.dindis.filter((d) => d.isCustomRegistered);
 
-  const handle1TapReport = (label: string, _emoji: string, severity: "HIGH" | "CRITICAL" | "MEDIUM") => {
+  const handle1TapReport = (label: string, _emoji: string, severity: "HIGH" | "CRITICAL" | "MEDIUM", customCampId?: string) => {
+    const targetId = customCampId || (reportCampId !== "ALL" ? reportCampId : selectedCampId !== "ALL" ? selectedCampId : "CAMP-01");
+    const targetCamp = state.camps.find((c) => c.id === targetId) ?? state.camps[0];
+
     reportVolunteerIncident({
       label,
       severity,
-      lat: coords?.lat,
-      lng: coords?.lng,
+      campId: targetCamp.id,
+      lat: targetCamp.lat,
+      lng: targetCamp.lng,
     });
 
-    setReportSuccess(label);
-    setTimeout(() => setReportSuccess(null), 5000);
+    setReportSuccess(`${label} reported for ${targetCamp.name}`);
+    setTimeout(() => setReportSuccess(null), 6000);
   };
 
   React.useEffect(() => {
@@ -374,6 +386,35 @@ export default function VolunteerPortal() {
               <div>
                 <h2 className="text-sm font-bold text-wari-textPrimary">1-Tap Field Incident Report</h2>
                 <p className="text-xs text-wari-textMuted">Real GPS coordinates auto-attached and sent to Command Centre</p>
+              </div>
+            </div>
+
+            {/* Target Camp Selector for Reporting */}
+            <div className="p-3.5 bg-red-50/60 rounded-xl border border-red-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-red-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-red-600" />
+                  Select Target Camp for Incident
+                </span>
+                <span className="text-[11px] font-bold text-red-800 bg-red-100 px-2.5 py-0.5 rounded-full">
+                  {state.camps.find((c) => c.id === reportCampId)?.name ?? "Camp 1"}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1.5 pt-1">
+                {state.camps.slice(0, 6).map((c, idx) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setReportCampId(c.id)}
+                    className={`px-2.5 py-2 rounded-xl text-xs font-bold transition-all truncate text-center ${
+                      reportCampId === c.id
+                        ? "bg-red-600 text-white shadow-sm ring-2 ring-red-300"
+                        : "bg-white text-red-950 border border-red-200 hover:bg-red-100/60"
+                    }`}
+                  >
+                    Camp {idx + 1}
+                  </button>
+                ))}
               </div>
             </div>
 

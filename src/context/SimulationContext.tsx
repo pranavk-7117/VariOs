@@ -81,8 +81,35 @@ function getNearestHaltPlan(state: SimulationState, lat: number, lng: number, pa
   };
 }
 
+function computeLiveCamps(dindis: Dindi[], baseCamps: Camp[]): Camp[] {
+  return baseCamps.map((camp) => {
+    const assignedPilgrims = dindis
+      .filter((d) => d.isCustomRegistered)
+      .filter((d) => {
+        const closest = baseCamps
+          .map((c) => ({ c, dist: getDistanceKm(d.lat, d.lng, c.lat, c.lng) }))
+          .sort((a, b) => a.dist - b.dist)[0];
+        return closest?.c.id === camp.id;
+      })
+      .reduce((sum, d) => sum + d.pilgrimCount, 0);
+
+    const occupancyPercent = Math.min(100, Math.round((assignedPilgrims / camp.capacity) * 100));
+    return {
+      ...camp,
+      currentOccupancy: assignedPilgrims,
+      occupancyPercent,
+      waterStockPercent: 95,
+      waterBurnRateLitersPerMin: Math.max(20, Math.round(assignedPilgrims * 0.05)),
+      minutesToWaterDepletion: 360,
+      foodStockPercent: 92,
+      shelterStatus: occupancyPercent > 90 ? "ATTENTION" : "STABLE",
+      status: occupancyPercent > 90 ? "ATTENTION" : "NORMAL",
+    };
+  });
+}
+
 export const SimulationProvider = ({ children }: { children: ReactNode }) => {
-  // Start in Live Real Mode — empty state
+  // Start in Live Real Mode — empty state with pure real baseline
   const [state, setState] = useState<SimulationState>(LIVE_INITIAL_STATE);
   // Keep track of live-registered Dindis so they survive mode switches
   const [liveDindis, setLiveDindis] = useState<SimulationState["dindis"]>([]);
@@ -102,6 +129,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
               ...prev,
               dindis: parsed,
               totalPilgrims: parsed.reduce((sum, dindi) => sum + dindi.pilgrimCount, 0),
+              camps: computeLiveCamps(parsed, LIVE_SUPPORT_CAMPS),
             };
           });
           setHasLoadedLiveStore(true);
@@ -142,8 +170,13 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
       // Switching TO Demo Archive — load historical data + merge live dindis on top
       setState({ ...DEMO_INITIAL_STATE, dindis: [...liveDindis, ...DEMO_INITIAL_STATE.dindis] });
     } else {
-      // Switching TO Live Real Mode — clear all demo data, keep live registered dindis
-      setState({ ...LIVE_INITIAL_STATE, dindis: liveDindis });
+      // Switching TO Live Real Mode — clear all demo data, calculate real live camps
+      setState({
+        ...LIVE_INITIAL_STATE,
+        dindis: liveDindis,
+        totalPilgrims: liveDindis.reduce((sum, d) => sum + d.pilgrimCount, 0),
+        camps: computeLiveCamps(liveDindis, LIVE_SUPPORT_CAMPS),
+      });
     }
   }, [liveDindis]);
 
@@ -324,22 +357,26 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
 
       setLiveDindis((prev) => [newDindi, ...prev]);
 
-      setState((prev) => ({
-        ...prev,
-        totalPilgrims: prev.totalPilgrims + params.count,
-        dindis: [newDindi, ...prev.dindis],
-        events: [
-          {
-            id: `EV-${now}`,
-            timestamp: timeString,
-            eventType: "DISPATCH" as const,
-            severity: "INFO" as const,
-            source: "Dindi Leader Registration",
-            description: `NEW DINDI: ${params.name} | Leader: ${params.leader} | Passcode: ${passcode} | ~${params.count.toLocaleString()} pilgrims`,
-          },
-          ...prev.events,
-        ],
-      }));
+      setState((prev) => {
+        const nextDindis = [newDindi, ...prev.dindis];
+        return {
+          ...prev,
+          totalPilgrims: prev.totalPilgrims + params.count,
+          dindis: nextDindis,
+          camps: !prev.isSimulating ? computeLiveCamps(nextDindis, LIVE_SUPPORT_CAMPS) : prev.camps,
+          events: [
+            {
+              id: `EV-${now}`,
+              timestamp: timeString,
+              eventType: "DISPATCH" as const,
+              severity: "INFO" as const,
+              source: "Dindi Leader Registration",
+              description: `NEW DINDI: ${params.name} | Leader: ${params.leader} | Passcode: ${passcode} | ~${params.count.toLocaleString()} pilgrims`,
+            },
+            ...prev.events,
+          ],
+        };
+      });
 
       return { dindiId, passcode, dindiNumber };
     },
@@ -717,6 +754,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         ...prev,
         dindis: remaining,
         totalPilgrims: remaining.reduce((sum, d) => sum + d.pilgrimCount, 0),
+        camps: !prev.isSimulating ? computeLiveCamps(remaining, LIVE_SUPPORT_CAMPS) : prev.camps,
         events: [
           {
             id: `EV-DEL-${Date.now()}`,

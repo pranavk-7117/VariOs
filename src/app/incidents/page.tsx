@@ -38,6 +38,7 @@ export default function IncidentsPage() {
     openTemporaryAuxiliaryCamp,
     regulatePalkhiPace,
     staggerDindiRoutes,
+    markBatchDeparted,
     isMitigated,
   } = useSimulation();
 
@@ -377,7 +378,7 @@ export default function IncidentsPage() {
                             <span className="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded font-mono font-bold">GPS Live</span>
                           </div>
                           <p className="text-[11px] text-wari-textSecond">
-                            Live telemetry tracks <strong>{syncPlan.convergingDindis[0].name}</strong> &amp; <strong>{syncPlan.convergingDindis[1].name}</strong> converging on {syncPlan.targetCamp.name}.
+                            Live telemetry tracks <strong>{syncPlan.batches.length} Dindis</strong> ({syncPlan.convergingDindis.map(d => d.name).join(", ")}) converging on {syncPlan.targetCamp.name}.
                           </p>
                         </div>
 
@@ -397,7 +398,7 @@ export default function IncidentsPage() {
                             <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded font-mono font-bold">+{syncPlan.staggerDeltaMinutes}m Offset</span>
                           </div>
                           <p className="text-[11px] text-wari-textSecond">
-                            Reroutes Dindi 1 via <strong>Shortest Corridor</strong> and Dindi 2 via <strong>Scenic Outer Bypass</strong> to stagger arrivals.
+                            Routes {syncPlan.batches.length} Dindis via <strong>staggered corridors</strong> — each arriving 50+ min apart for zero congestion.
                           </p>
                         </div>
 
@@ -407,53 +408,59 @@ export default function IncidentsPage() {
                             <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-mono font-bold">Advance Prep</span>
                           </div>
                           <p className="text-[11px] text-wari-textSecond">
-                            Pre-notifies Maha-Prasad kitchen, water tankers &amp; sanitation crews with batch timing schedule.
+                            Pre-notifies Maha-Prasad kitchen, water tankers & sanitation crews with batch timing schedule.
                           </p>
                         </div>
                       </div>
 
-                      {/* Route Staggering Comparison Cards */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                        <div className="p-3.5 bg-emerald-50/70 border border-emerald-300 rounded-xl space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
-                              <CheckCircle className="w-4 h-4 text-emerald-600" />
-                              <strong className="text-xs text-emerald-950 font-black">
-                                {syncPlan.dindiShortRoute.dindi.name} (Shortest Route)
-                              </strong>
-                            </div>
-                            <span className="text-[10px] font-bold bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full">
-                              Batch 1 • {syncPlan.dindiShortRoute.arrivalWindow}
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-emerald-900 space-y-1">
-                            <p><strong>Assigned Route:</strong> {syncPlan.dindiShortRoute.routeName}</p>
-                            <p className="text-[10px] text-emerald-700 font-mono">📍 Path: {syncPlan.dindiShortRoute.routeWaypoints} ({syncPlan.dindiShortRoute.distanceKm} km · {syncPlan.dindiShortRoute.paceKmH} km/h)</p>
-                          </div>
-                          <p className="text-[11px] text-emerald-800 bg-white/80 p-2.5 rounded-lg border border-emerald-200">
-                            ✓ {syncPlan.dindiShortRoute.actionNote}
-                          </p>
-                        </div>
-
-                        <div className="p-3.5 bg-purple-50/70 border border-purple-300 rounded-xl space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
-                              <Navigation className="w-4 h-4 text-purple-600" />
-                              <strong className="text-xs text-purple-950 font-black">
-                                {syncPlan.dindiLongRoute.dindi.name} (Scenic Bypass)
-                              </strong>
-                            </div>
-                            <span className="text-[10px] font-bold bg-purple-200 text-purple-900 px-2 py-0.5 rounded-full">
-                              Batch 2 • {syncPlan.dindiLongRoute.arrivalWindow}
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-purple-900 space-y-1">
-                            <p><strong>Assigned Route:</strong> {syncPlan.dindiLongRoute.routeName}</p>
-                            <p className="text-[10px] text-purple-700 font-mono">📍 Path: {syncPlan.dindiLongRoute.routeWaypoints} ({syncPlan.dindiLongRoute.distanceKm} km · {syncPlan.dindiLongRoute.paceKmH} km/h)</p>
-                          </div>
-                          <p className="text-[11px] text-purple-800 bg-white/80 p-2.5 rounded-lg border border-purple-200">
-                            ✓ {syncPlan.dindiLongRoute.actionNote}
-                          </p>
+                      {/* N-Batch Pipeline Cards */}
+                      <div className="space-y-2.5">
+                        <span className="text-[11px] font-bold text-purple-950 uppercase tracking-wider block">
+                          📦 Batch Arrival Pipeline ({syncPlan.batches.length} Dindis Sequenced)
+                        </span>
+                        <div className={`grid gap-3 ${syncPlan.batches.length === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-3"}`}>
+                          {syncPlan.batches.map((batch) => {
+                            const batchColors = [
+                              { border: "border-emerald-300", bg: "bg-emerald-50/70", badge: "bg-emerald-200 text-emerald-900", text: "text-emerald-900", icon: <CheckCircle className="w-4 h-4 text-emerald-600" /> },
+                              { border: "border-purple-300", bg: "bg-purple-50/70", badge: "bg-purple-200 text-purple-900", text: "text-purple-900", icon: <Navigation className="w-4 h-4 text-purple-600" /> },
+                              { border: "border-orange-300", bg: "bg-orange-50/70", badge: "bg-orange-200 text-orange-900", text: "text-orange-900", icon: <Clock className="w-4 h-4 text-orange-600" /> },
+                            ];
+                            const col = batchColors[Math.min(batch.batchNumber - 1, batchColors.length - 1)];
+                            const isDeparted = batch.dindi.batchStatus === "DEPARTED";
+                            return (
+                              <div key={batch.batchNumber} className={`p-3.5 ${col.bg} border ${col.border} rounded-xl space-y-2 ${isDeparted ? "opacity-60" : ""}`}>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    {col.icon}
+                                    <strong className={`text-xs ${col.text} font-black`}>
+                                      {batch.dindi.name} {isDeparted ? "✅ Departed" : ""}
+                                    </strong>
+                                  </div>
+                                  <span className={`text-[10px] font-bold ${col.badge} px-2 py-0.5 rounded-full`}>
+                                    Batch {batch.batchNumber} • {batch.arrivalWindow}
+                                  </span>
+                                </div>
+                                <div className={`text-[11px] ${col.text} space-y-0.5`}>
+                                  <p><strong>Assigned Route:</strong> {batch.routeName}</p>
+                                  <p className={`text-[10px] font-mono ${col.text}/80`}>📍 Path: {batch.routeWaypoints}</p>
+                                  <p className="text-[10px] font-mono">{batch.distanceKm} km · {batch.paceKmH} km/h</p>
+                                </div>
+                                <p className={`text-[11px] ${col.text} bg-white/80 p-2.5 rounded-lg border ${col.border}`}>
+                                  ✓ {batch.actionNote}
+                                </p>
+                                {/* Confirm Departed Button */}
+                                {!isDeparted && targetCamp && (
+                                  <button
+                                    onClick={() => markBatchDeparted(batch.dindi.id, targetCamp.id)}
+                                    className={`w-full mt-1 px-3 py-1.5 rounded-lg text-[11px] font-bold border ${col.border} bg-white hover:bg-white/90 ${col.text} flex items-center justify-center gap-1.5 active:scale-95`}
+                                  >
+                                    <CheckCircle className="w-3 h-3" />
+                                    Confirm Batch {batch.batchNumber} Departed → Auto-Check Next Resources
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
 
@@ -471,10 +478,10 @@ export default function IncidentsPage() {
                       {/* Advance Logistics Notification Schedule */}
                       <div className="bg-white/90 rounded-xl p-3.5 border border-purple-200 space-y-2 text-xs">
                         <span className="font-bold text-purple-950 block text-[11px] uppercase tracking-wider">
-                          📢 Advance Logistics Notification Schedule (Kitchen / Water / Sanitation)
+                          📢 Advance Logistics Schedule ({syncPlan.advanceAlerts.length} Notifications)
                         </span>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                          {syncPlan.advanceAlerts.slice(0, 3).map((al, idx) => (
+                          {syncPlan.advanceAlerts.slice(0, 6).map((al, idx) => (
                             <div key={idx} className="p-2.5 rounded-lg bg-purple-50/60 border border-purple-100 space-y-1">
                               <div className="flex items-center justify-between text-[10px] font-bold">
                                 <span className="text-purple-800">{al.targetBatch}</span>

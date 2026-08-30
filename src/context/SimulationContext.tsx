@@ -23,7 +23,7 @@ import {
   executeDispatchAction,
   tickSimulationEngine,
 } from "@/lib/simulation-engine";
-import { getDistanceKm, getLiveCrowdClusters, computeDindiSyncPlan } from "@/lib/live-ops";
+import { getDistanceKm, getLiveCrowdClusters, computeDindiSyncPlan, computeResourceSufficiency } from "@/lib/live-ops";
 import { clearLocalLiveDindis, deleteLiveDindi, loadLiveDindis, saveLiveDindis } from "@/lib/live-store";
 
 interface SimulationContextType {
@@ -76,6 +76,7 @@ interface SimulationContextType {
   openTemporaryAuxiliaryCamp: (baseCampId: string) => void;
   regulatePalkhiPace: (action: "THROTTLE_PACE" | "RELEASE_BATCH") => void;
   staggerDindiRoutes: (targetCampId?: string) => void;
+  markBatchDeparted: (dindiId: string, campId: string) => void;
 }
 
 const SimulationContext = createContext<SimulationContextType | undefined>(undefined);
@@ -1464,6 +1465,221 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
+  // Mark a Dindi batch as departed from a camp, then auto-evaluate resource sufficiency
+  // for the NEXT incoming batch and create refill tasks if stock is insufficient.
+  const markBatchDeparted = useCallback((dindiId: string, campId: string) => {
+    const ts = new Date();
+    const timeString = `${ts.getHours().toString().padStart(2, "0")}:${ts.getMinutes().toString().padStart(2, "0")}:${ts.getSeconds().toString().padStart(2, "0")}`;
+    const nowId = Date.now();
+
+    setState((prev) => {
+      // 1. Mark this Dindi as DEPARTED
+      const departedDindi = prev.dindis.find((d) => d.id === dindiId);
+      if (!departedDindi) return prev;
+
+      const updatedDindis = prev.dindis.map((d) =>
+        d.id === dindiId
+          ? { ...d, batchStatus: "DEPARTED" as const, departedFromCampId: campId }
+          : d
+      );
+
+      // Update liveDindis too
+      setLiveDindis((curr) =>
+        curr.map((d) =>
+          d.id === dindiId
+            ? { ...d, batchStatus: "DEPARTED" as const, departedFromCampId: campId }
+            : d
+        )
+      );
+
+      // 2. Find the next batch — the active (non-departed) Dindi with highest pilgrimCount
+      const remainingActive = updatedDindis
+        .filter((d) => d.isCustomRegistered && d.batchStatus !== "DEPARTED")
+        .sort((a, b) => b.pilgrimCount - a.pilgrimCount);
+
+      const nextBatch = remainingActive[0];
+      const targetCamp = prev.camps.find((c) => c.id === campId) ?? prev.camps[0];
+
+      // Base events + update
+      const baseEvents: typeof prev.events = [
+        {
+          id: `EV-DEPARTED-${nowId}`,
+          timestamp: timeString,
+          eventType: "VERIFICATION" as const,
+          severity: "SUCCESS" as const,
+          source: "Volunteer Field Confirmation",
+          description: `✅ ${departedDindi.name} (Batch, ~${departedDindi.pilgrimCount.toLocaleString()} pilgrims) confirmed DEPARTED from ${targetCamp.name}. Camp now clearing for next batch.`,
+        },
+        ...prev.events,
+      ];
+
+      if (!nextBatch) {
+        // No more batches — all done
+        return {
+          ...prev,
+          dindis: updatedDindis,
+          events: [
+            {
+              id: `EV-ALL-DEPARTED-${nowId}`,
+              timestamp: timeString,
+              eventType: "VERIFICATION" as const,
+              severity: "SUCCESS" as const,
+              source: "Batch Pipeline Engine",
+              description: `🎉 All registered Dindis have departed ${targetCamp.name}. Camp is now available for next pilgrim wave.`,
+            },
+            ...baseEvents,
+          ],
+          alerts: [
+            {
+              id: `ALT-ALL-CLEAR-${nowId}`,
+              title: `✅ All Batches Departed — ${targetCamp.name} Cleared`,
+              location: targetCamp.name,
+              severity: "LOW" as const,
+              cause: `All registered Dindi batches have completed their halt and departed ${targetCamp.name}.`,
+              forecastText: `Camp is now clear. Resources can be redistributed to next corridor sector.`,
+              recommendedAction: `Conduct final sanitation sweep and reset resource inventory for next pilgrim wave.`,
+              timestamp: timeString,
+              status: "ACTIVE" as const,
+              timeToCriticalMinutes: 0,
+              priorityScore: 10,
+              scoreBreakdown: { density: 0, urgency: 0, population: 5, resource: 5 },
+            },
+            ...prev.alerts,
+          ],
+        };
+      }
+
+      // 3. Evaluate resource sufficiency for the next batch
+      const sufficiency = computeResourceSufficiency(targetCamp, nextBatch);
+
+      const newEvents: typeof prev.events = [...baseEvents];
+      const newAlerts: typeof prev.alerts = [...prev.alerts];
+      const newTasks: VolunteerTask[] = [...prev.volunteerTasks];
+      let updatedCamps = prev.camps;
+      let updatedTankers = prev.tankers;
+      let updatedFood = prev.foodSupplies;
+
+      if (sufficiency.autoTasksGenerated) {
+        // Not enough — auto-generate refill tasks
+        const designatedVolunteer =
+          prev.volunteers.find((v) => v.assignedCampId === campId) ??
+          prev.volunteers.find((v) => v.status === "AVAILABLE") ??
+          prev.volunteers[0];
+
+        const availableTanker = prev.tankers.find((t) => t.status === "AVAILABLE");
+        const availableFood = prev.foodSupplies?.find((f) => f.status === "AVAILABLE");
+
+        const refillTasks: VolunteerTask[] = [];
+
+        if (!sufficiency.waterSufficient && availableTanker) {
+          refillTasks.push({
+            id: `TASK-REFILL-WATER-${nowId}`,
+            campId: targetCamp.id,
+            campName: targetCamp.name,
+            volunteerId: designatedVolunteer?.id ?? "VOL-GEN",
+            volunteerName: designatedVolunteer?.name ?? "Camp Volunteer",
+            title: `🚰 Auto-Refill: Water tanker ${availableTanker.id} needed before ${nextBatch.name} arrives (${sufficiency.waterShortfallPct}% shortfall)`,
+            type: "WATER_TANKER",
+            etaMinutes: 15,
+            status: "ASSIGNED",
+            remarks: `Auto-generated: ${targetCamp.name} has ${sufficiency.currentWaterPct}% water but needs ${sufficiency.requiredWaterPct}% for incoming ${nextBatch.name} (${nextBatch.pilgrimCount.toLocaleString()} pilgrims).`,
+            createdAt: timeString,
+            updatedAt: timeString,
+          });
+          updatedTankers = prev.tankers.map((t) =>
+            t.id === availableTanker.id
+              ? { ...t, status: "EN_ROUTE" as const, assignedCampId: targetCamp.name, etaMinutes: 15 }
+              : t
+          );
+        }
+
+        if (!sufficiency.foodSufficient && availableFood) {
+          refillTasks.push({
+            id: `TASK-REFILL-FOOD-${nowId + 1}`,
+            campId: targetCamp.id,
+            campName: targetCamp.name,
+            volunteerId: designatedVolunteer?.id ?? "VOL-GEN",
+            volunteerName: designatedVolunteer?.name ?? "Camp Volunteer",
+            title: `🍱 Auto-Refill: Prasad kitchen ${availableFood.name} needed before ${nextBatch.name} arrives (${sufficiency.foodShortfallPct}% shortfall)`,
+            type: "FOOD_SUPPLY",
+            etaMinutes: 18,
+            status: "ASSIGNED",
+            remarks: `Auto-generated: ${targetCamp.name} has ${sufficiency.currentFoodPct}% food but needs ${sufficiency.requiredFoodPct}% for incoming ${nextBatch.name} (${nextBatch.pilgrimCount.toLocaleString()} pilgrims).`,
+            createdAt: timeString,
+            updatedAt: timeString,
+          });
+          updatedFood = prev.foodSupplies?.map((f) =>
+            f.id === availableFood.id
+              ? { ...f, status: "EN_ROUTE" as const, assignedCampId: targetCamp.name, etaMinutes: 18 }
+              : f
+          );
+        }
+
+        newTasks.unshift(...refillTasks);
+
+        newAlerts.unshift({
+          id: `ALT-REFILL-${nowId}`,
+          title: `⚠️ Auto-Refill Triggered for ${nextBatch.name} — ${targetCamp.name}`,
+          location: targetCamp.name,
+          severity: "HIGH",
+          cause: sufficiency.recommendation,
+          forecastText: `${nextBatch.name} (${nextBatch.pilgrimCount.toLocaleString()} pilgrims) is the next incoming batch. Current stock insufficient. Auto-dispatch completed.`,
+          recommendedAction: `Verify tanker/kitchen arrival before ${nextBatch.name} arrives. ${refillTasks.length} auto-task(s) generated for volunteer ground verification.`,
+          timestamp: timeString,
+          status: "ACTIVE",
+          timeToCriticalMinutes: 20,
+          priorityScore: 75,
+          scoreBreakdown: { density: 15, urgency: 30, population: 20, resource: 10 },
+        });
+
+        newEvents.unshift({
+          id: `EV-REFILL-${nowId}`,
+          timestamp: timeString,
+          eventType: "DISPATCH" as const,
+          severity: "WARNING" as const,
+          source: "Auto Resource Engine",
+          description: `⚠️ Post-departure check: ${targetCamp.name} has insufficient stock for ${nextBatch.name}. Auto-dispatched: ${refillTasks.map((t) => t.title).join(" | ")}`,
+        });
+      } else {
+        // Sufficient — just log a nominal event
+        newEvents.unshift({
+          id: `EV-SUFFICIENT-${nowId}`,
+          timestamp: timeString,
+          eventType: "VERIFICATION" as const,
+          severity: "SUCCESS" as const,
+          source: "Auto Resource Engine",
+          description: `✅ Post-departure check: ${targetCamp.name} has sufficient resources for ${nextBatch.name} (${nextBatch.pilgrimCount.toLocaleString()} pilgrims). Water: ${sufficiency.currentWaterPct}% ≥ ${sufficiency.requiredWaterPct}% needed. No refill required.`,
+        });
+
+        newAlerts.unshift({
+          id: `ALT-SUFFICIENT-${nowId}`,
+          title: `✅ Resources Sufficient for ${nextBatch.name} — ${targetCamp.name}`,
+          location: targetCamp.name,
+          severity: "LOW",
+          cause: sufficiency.recommendation,
+          forecastText: `No refill dispatch needed. ${targetCamp.name} is ready to receive ${nextBatch.name} (${nextBatch.pilgrimCount.toLocaleString()} pilgrims).`,
+          recommendedAction: `Continue Batch Pipeline: ${nextBatch.name} will arrive via assigned route. Monitor resource burn rate.`,
+          timestamp: timeString,
+          status: "ACTIVE",
+          timeToCriticalMinutes: 60,
+          priorityScore: 20,
+          scoreBreakdown: { density: 5, urgency: 5, population: 5, resource: 5 },
+        });
+      }
+
+      return {
+        ...prev,
+        dindis: updatedDindis,
+        tankers: updatedTankers,
+        foodSupplies: updatedFood,
+        camps: updatedCamps,
+        volunteerTasks: newTasks,
+        alerts: newAlerts,
+        events: newEvents,
+      };
+    });
+  }, []);
+
   return (
     <SimulationContext.Provider
       value={{
@@ -1494,6 +1710,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         openTemporaryAuxiliaryCamp,
         regulatePalkhiPace,
         staggerDindiRoutes,
+        markBatchDeparted,
       }}
     >
       {children}

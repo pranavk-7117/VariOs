@@ -168,30 +168,10 @@ export interface DindiSyncPlan {
   targetCamp: Camp;
   convergingDindis: Dindi[];
   totalPilgrims: number;
-  dindiShortRoute: {
-    dindi: Dindi;
-    routeName: string;
-    routeType: "SHORTEST_PRIMARY" | "MAIN_CORRIDOR";
-    routeWaypoints: string;
-    distanceKm: number;
-    paceKmH: number;
-    etaMinutes: number;
-    arrivalWindow: string;
-    departureWindow: string;
-    actionNote: string;
-  };
-  dindiLongRoute: {
-    dindi: Dindi;
-    routeName: string;
-    routeType: "STAGGERED_BYPASS" | "SCENIC_OUTER";
-    routeWaypoints: string;
-    distanceKm: number;
-    paceKmH: number;
-    etaMinutes: number;
-    arrivalWindow: string;
-    departureWindow: string;
-    actionNote: string;
-  };
+  batches: import("./types").DindiBatch[];
+  // Legacy 2-dindi compat fields
+  dindiShortRoute: import("./types").DindiBatch;
+  dindiLongRoute: import("./types").DindiBatch;
   staggerDeltaMinutes: number;
   campPeakOccupancyBefore: number;
   campPeakOccupancyAfter: number;
@@ -204,12 +184,37 @@ export interface DindiSyncPlan {
   }[];
 }
 
+// Route configs for each batch slot
+const ROUTE_CONFIGS = [
+  {
+    routeType: "SHORTEST_PRIMARY" as const,
+    routeName: "Primary Express Corridor (NH-965 Direct Highway)",
+    routeWaypoints: "Main Pilgrim Spine → NH-965 Highway → Gate A Main Entrance",
+    extraDistKm: 0,
+    paceMultiplier: 1.0,
+  },
+  {
+    routeType: "STAGGERED_BYPASS" as const,
+    routeName: "Scenic Riverside Outer Bypass (Mutha Canal Corridor)",
+    routeWaypoints: "Bifurcation Junction 3 → Mutha Canal Shaded Road → Gate B Auxiliary Approach",
+    extraDistKm: 3.4,
+    paceMultiplier: 0.84,
+  },
+  {
+    routeType: "HOLDING_LOOP" as const,
+    routeName: "Extended Holding Loop (Outer Ring Buffer Route)",
+    routeWaypoints: "Ring Road Entry → Outer Buffer Loop → Gate C Service Lane Approach",
+    extraDistKm: 7.2,
+    paceMultiplier: 0.75,
+  },
+];
+
 export function computeDindiSyncPlan(
   dindis: Dindi[],
   camps: Camp[],
   targetCampId?: string
 ): DindiSyncPlan | null {
-  const registered = dindis.filter((d) => d.isCustomRegistered);
+  const registered = dindis.filter((d) => d.isCustomRegistered && d.batchStatus !== "DEPARTED");
   if (registered.length < 2) return null;
 
   const targetCamp =
@@ -217,92 +222,151 @@ export function computeDindiSyncPlan(
     camps.find((c) => c.occupancyPercent >= 90) ??
     camps[0];
 
-  const sortedByCount = [...registered].sort((a, b) => b.pilgrimCount - a.pilgrimCount);
-  const dindiA = sortedByCount[0];
-  const dindiB = sortedByCount[1];
+  // Sort by pilgrim count desc — largest Dindi goes first (needs most space, serves fastest)
+  const sortedDindis = [...registered].sort((a, b) => b.pilgrimCount - a.pilgrimCount);
 
-  const baseDistKm = nearest(dindiA.lat, dindiA.lng, camps)?.distanceKm ?? 4.2;
+  const baseDistKm = nearest(sortedDindis[0].lat, sortedDindis[0].lng, camps)?.distanceKm ?? 4.2;
   const shortDistKm = Math.max(3.2, Math.round(baseDistKm * 10) / 10);
-  const longDistKm = Math.round((shortDistKm + 3.4) * 10) / 10;
 
-  const paceA = dindiA.speedKmH && dindiA.speedKmH > 1 ? dindiA.speedKmH : (dindiA.currentPaceKmH || 3.8);
-  const paceB = dindiB.speedKmH && dindiB.speedKmH > 1 ? dindiB.speedKmH : 3.2; // Slightly slowed for pacing
+  // Build N batches
+  const batches: import("./types").DindiBatch[] = sortedDindis.map((dindi, idx) => {
+    const cfg = ROUTE_CONFIGS[Math.min(idx, ROUTE_CONFIGS.length - 1)];
+    const distKm = Math.round((shortDistKm + cfg.extraDistKm) * 10) / 10;
+    const pace = (dindi.speedKmH && dindi.speedKmH > 1 ? dindi.speedKmH : dindi.currentPaceKmH || 3.8) * cfg.paceMultiplier;
+    const eta = Math.round((distKm / Math.max(pace, 1)) * 60);
+    const staggerMinutes = idx === 0 ? 0 : batches.slice(0, idx).reduce((s, b) => Math.max(s, b.etaMinutes), 0) + 55;
+    const effectiveEta = idx === 0 ? eta : staggerMinutes;
 
-  const etaShortMin = Math.round((shortDistKm / paceA) * 60);
-  const etaLongMin = Math.round((longDistKm / paceB) * 60);
-  const staggerDelta = Math.max(35, etaLongMin - etaShortMin);
+    return {
+      batchNumber: idx + 1,
+      dindi,
+      routeName: cfg.routeName,
+      routeType: cfg.routeType,
+      routeWaypoints: cfg.routeWaypoints,
+      distanceKm: distKm,
+      paceKmH: Math.round(pace * 10) / 10,
+      etaMinutes: effectiveEta,
+      arrivalWindow: idx === 0
+        ? `+${eta}m (Batch 1)`
+        : `+${effectiveEta}m (Batch ${idx + 1} - +${effectiveEta - (batches[0]?.etaMinutes ?? 0)}m Offset)`,
+      departureWindow: `+${effectiveEta + 50}m`,
+      actionNote: idx === 0
+        ? `Take shortest direct route (${distKm} km). Proceed to ${targetCamp.name} for immediate meal service & rest, then depart by +${effectiveEta + 50}m before Batch 2 arrives.`
+        : idx === 1
+        ? `Reroute to outer bypass (+${cfg.extraDistKm} km). Enjoy shaded open corridor. Arrive at ${targetCamp.name} after Batch 1 departs with zero entrance queueing.`
+        : `Follow extended holding loop (+${cfg.extraDistKm} km buffer). Arrive at ${targetCamp.name} only after Batch ${idx} fully clears — zero wait guaranteed.`,
+    };
+  });
 
-  const totalPilgrims = dindiA.pilgrimCount + dindiB.pilgrimCount;
+  const totalPilgrims = sortedDindis.reduce((s, d) => s + d.pilgrimCount, 0);
   const campCapacity = targetCamp.capacity || 40000;
   const peakBeforePct = Math.round((totalPilgrims / campCapacity) * 100);
-  const peakAfterPct = Math.round((Math.max(dindiA.pilgrimCount, dindiB.pilgrimCount) / campCapacity) * 100);
+  const peakAfterPct = Math.round((Math.max(...sortedDindis.map(d => d.pilgrimCount)) / campCapacity) * 100);
+  const staggerDelta = batches.length >= 2 ? batches[1].etaMinutes - batches[0].etaMinutes : 55;
 
-  const rationale = `By assigning ${dindiA.name} to the Shortest Direct Express Route and rerouting ${dindiB.name} via the Scenic Riverside Bypass, their arrivals at ${targetCamp.name} are staggered by +${staggerDelta} min. When ${dindiB.name} arrives, ${dindiA.name} will have completed prasad and started moving to the next transit sector. This prevents entrance bottlenecks and cuts camp peak load from ${peakBeforePct}% to a safe ${peakAfterPct}%.`;
+  const rationaleLines = batches.map((b, i) =>
+    i === 0
+      ? `${b.dindi.name} → ${b.routeName} (arrives T+${b.etaMinutes}m)`
+      : `${b.dindi.name} → ${b.routeName} (arrives T+${b.etaMinutes}m, +${b.etaMinutes - batches[0].etaMinutes}m after Batch 1)`
+  );
+
+  const rationale = `${rationaleLines.join("; ")}. This staggering prevents simultaneous arrival at ${targetCamp.name} and cuts peak camp load from ${peakBeforePct}% (all at once) to a manageable ${peakAfterPct}% per batch window.`;
+
+  // Build advance logistics notifications for all batches
+  const advanceAlerts: DindiSyncPlan["advanceAlerts"] = [];
+  batches.forEach((b) => {
+    advanceAlerts.push({
+      department: "FOOD_PRASAD",
+      scheduledTime: `T + ${Math.max(10, b.etaMinutes - 15)}m`,
+      action: `Prepare Batch ${b.batchNumber} Maha-Prasad (${b.dindi.pilgrimCount.toLocaleString()} meals) at ${targetCamp.name} for ${b.dindi.name}.`,
+      targetBatch: `Batch ${b.batchNumber}`,
+    });
+    advanceAlerts.push({
+      department: "WATER_TANKER",
+      scheduledTime: `T + ${Math.max(10, b.etaMinutes - 10)}m`,
+      action: `Connect Primary Tanker at ${targetCamp.name} for Batch ${b.batchNumber} hydration stations (${b.dindi.pilgrimCount.toLocaleString()} pilgrims).`,
+      targetBatch: `Batch ${b.batchNumber}`,
+    });
+    if (b.batchNumber > 1) {
+      advanceAlerts.push({
+        department: "SANITATION",
+        scheduledTime: `T + ${batches[b.batchNumber - 2].etaMinutes + 45}m`,
+        action: `Rapid disinfection & bio-pod cleanout at ${targetCamp.name} during inter-batch gap (Batch ${b.batchNumber - 1} departure → Batch ${b.batchNumber} arrival).`,
+        targetBatch: `Inter-batch Gap ${b.batchNumber - 1}→${b.batchNumber}`,
+      });
+      advanceAlerts.push({
+        department: "VOLUNTEER_MARSHAL",
+        scheduledTime: `T + ${batches[b.batchNumber - 2].etaMinutes + 50}m`,
+        action: `Guide ${batches[b.batchNumber - 2].dindi.name} to exit lane at ${targetCamp.name} toward next transit sector to clear space for incoming ${b.dindi.name}.`,
+        targetBatch: `Handover ${b.batchNumber - 1}→${b.batchNumber}`,
+      });
+    }
+  });
 
   return {
     targetCamp,
-    convergingDindis: [dindiA, dindiB],
+    convergingDindis: sortedDindis,
     totalPilgrims,
-    dindiShortRoute: {
-      dindi: dindiA,
-      routeName: "Primary Express Corridor (NH-965 Direct Highway)",
-      routeType: "SHORTEST_PRIMARY",
-      routeWaypoints: "Main Pilgrim Spine → NH-965 Highway → Gate A Main Entrance",
-      distanceKm: shortDistKm,
-      paceKmH: paceA,
-      etaMinutes: etaShortMin,
-      arrivalWindow: `+${etaShortMin}m (Batch 1)`,
-      departureWindow: `+${etaShortMin + 50}m`,
-      actionNote: `Take shortest direct route (${shortDistKm} km). Proceed to ${targetCamp.name} for immediate meal service & rest, then depart by +${etaShortMin + 50}m before Batch 2 arrives.`,
-    },
-    dindiLongRoute: {
-      dindi: dindiB,
-      routeName: "Scenic Riverside Outer Bypass (Mutha Canal Corridor)",
-      routeType: "STAGGERED_BYPASS",
-      routeWaypoints: "Bifurcation Junction 3 → Mutha Canal Shaded Road → Gate B Auxiliary Approach",
-      distanceKm: longDistKm,
-      paceKmH: paceB,
-      etaMinutes: etaLongMin,
-      arrivalWindow: `+${etaLongMin}m (Batch 2 - +${staggerDelta}m Offset)`,
-      departureWindow: `+${etaLongMin + 50}m`,
-      actionNote: `Reroute to outer bypass (+3.4 km). Enjoy shaded open corridor. Arrive at ${targetCamp.name} after Batch 1 departs with zero entrance queueing.`,
-    },
+    batches,
+    dindiShortRoute: batches[0],
+    dindiLongRoute: batches[1] ?? batches[0],
     staggerDeltaMinutes: staggerDelta,
     campPeakOccupancyBefore: peakBeforePct,
     campPeakOccupancyAfter: peakAfterPct,
     optimizationRationale: rationale,
-    advanceAlerts: [
-      {
-        department: "FOOD_PRASAD",
-        scheduledTime: `T + ${Math.max(10, etaShortMin - 15)}m`,
-        action: `Prepare Batch 1 Maha-Prasad (${dindiA.pilgrimCount.toLocaleString()} meals) at ${targetCamp.name} for ${dindiA.name}.`,
-        targetBatch: "Batch 1",
-      },
-      {
-        department: "WATER_TANKER",
-        scheduledTime: `T + ${Math.max(10, etaShortMin - 10)}m`,
-        action: `Connect Primary Tanker T-01 at ${targetCamp.name} for Batch 1 hydration stations.`,
-        targetBatch: "Batch 1",
-      },
-      {
-        department: "FOOD_PRASAD",
-        scheduledTime: `T + ${Math.max(20, etaLongMin - 15)}m`,
-        action: `Prepare Fresh Batch 2 Maha-Prasad (${dindiB.pilgrimCount.toLocaleString()} meals) at ${targetCamp.name} for ${dindiB.name}.`,
-        targetBatch: "Batch 2",
-      },
-      {
-        department: "SANITATION",
-        scheduledTime: `T + ${etaShortMin + 45}m`,
-        action: `Rapid disinfection & bio-pod cleanout at ${targetCamp.name} during 15-minute inter-batch turnover gap.`,
-        targetBatch: "Inter-batch Gap",
-      },
-      {
-        department: "VOLUNTEER_MARSHAL",
-        scheduledTime: `T + ${etaShortMin + 50}m`,
-        action: `Guide ${dindiA.name} to exit lane at ${targetCamp.name} towards next transit sector to clear space for incoming ${dindiB.name}.`,
-        targetBatch: "Handover",
-      },
-    ],
+    advanceAlerts,
+  };
+}
+
+/**
+ * After Batch N departs a camp, evaluate whether current water/food stock
+ * is sufficient for the next incoming batch. Returns a sufficiency result
+ * that the context can use to auto-generate refill tasks when needed.
+ */
+export function computeResourceSufficiency(
+  camp: Camp,
+  incomingDindi: Dindi
+): import("./types").ResourceSufficiencyResult {
+  const SAFETY_MARGIN = 1.5; // 1.5× headroom buffer
+  const campCapacity = camp.capacity || 40000;
+
+  const requiredWaterPct = Math.round(
+    (incomingDindi.pilgrimCount / campCapacity) * 100 * SAFETY_MARGIN
+  );
+  const requiredFoodPct = Math.round(
+    (incomingDindi.pilgrimCount / campCapacity) * 100 * SAFETY_MARGIN
+  );
+
+  const waterSufficient = camp.waterStockPercent >= requiredWaterPct;
+  const foodSufficient = camp.foodStockPercent >= requiredFoodPct;
+  const waterShortfallPct = Math.max(0, requiredWaterPct - camp.waterStockPercent);
+  const foodShortfallPct = Math.max(0, requiredFoodPct - camp.foodStockPercent);
+
+  let recommendation = "";
+  if (waterSufficient && foodSufficient) {
+    recommendation = `✅ Camp has sufficient resources for ${incomingDindi.name} (${incomingDindi.pilgrimCount.toLocaleString()} pilgrims). Water: ${camp.waterStockPercent}% ≥ ${requiredWaterPct}% needed. Food: ${camp.foodStockPercent}% ≥ ${requiredFoodPct}% needed. No refill required.`;
+  } else {
+    const parts: string[] = [];
+    if (!waterSufficient) parts.push(`Water: ${camp.waterStockPercent}% remaining but ${requiredWaterPct}% needed (shortfall ${waterShortfallPct}%) — tanker dispatch auto-triggered`);
+    if (!foodSufficient) parts.push(`Food: ${camp.foodStockPercent}% remaining but ${requiredFoodPct}% needed (shortfall ${foodShortfallPct}%) — kitchen dispatch auto-triggered`);
+    recommendation = `⚠️ Insufficient resources for ${incomingDindi.name} (${incomingDindi.pilgrimCount.toLocaleString()} pilgrims). ${parts.join(". ")}.`;
+  }
+
+  return {
+    campId: camp.id,
+    campName: camp.name,
+    incomingDindiName: incomingDindi.name,
+    incomingPilgrims: incomingDindi.pilgrimCount,
+    currentWaterPct: camp.waterStockPercent,
+    currentFoodPct: camp.foodStockPercent,
+    requiredWaterPct,
+    requiredFoodPct,
+    waterSufficient,
+    foodSufficient,
+    waterShortfallPct,
+    foodShortfallPct,
+    recommendation,
+    autoTasksGenerated: !waterSufficient || !foodSufficient,
   };
 }
 

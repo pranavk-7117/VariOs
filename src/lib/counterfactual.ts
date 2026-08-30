@@ -70,83 +70,96 @@ export interface CounterfactualComparison {
 export function generateCounterfactualData(
   rainMmH: number = 18,
   pilgrimMultiplier: number = 1.0,
-  dindiSpeed: number = 3.2
+  dindiSpeed: number = 3.2,
+  waterSupplyFactor: number = 1.0
 ): CounterfactualComparison[] {
-  // CP4 Density Timeline
-  const cp4Base = 91;
+  const rainFactor = 1 + rainMmH / 80;
+  const speedFactor = 3.4 / Math.max(1.0, dindiSpeed);
+
+  // Dynamic No-Action values
+  const noActionDensity = Math.round(Math.min(150, 91 * pilgrimMultiplier * rainFactor * (dindiSpeed < 3.0 ? 1.15 : 0.95)));
+  const wariosDensity = Math.round(Math.max(50, noActionDensity * 0.76));
+
+  const noActionCamp = Math.round(Math.min(180, 115 * pilgrimMultiplier * speedFactor));
+  const wariosCamp = Math.round(Math.max(55, Math.min(88, noActionCamp * 0.64)));
+
+  const noActionMed = Math.round(Math.min(100, (rainMmH * 1.2) + (pilgrimMultiplier * 42) + Math.max(0, (1 - waterSupplyFactor) * 30)));
+  const wariosMed = Math.round(Math.max(35, noActionMed * 0.66));
+
+  const noActionWaterMin = Math.max(0, Math.round((34 * waterSupplyFactor) / Math.max(0.7, pilgrimMultiplier) - (rainMmH > 25 ? 10 : 0)));
+  const wariosWaterMin = Math.round(noActionWaterMin + 45 * waterSupplyFactor);
+
+  // Dynamic Timelines
   const cp4Timeline = [
-    { minute: 0, noAction: cp4Base, warios: cp4Base },
-    { minute: 10, noAction: Math.min(105, cp4Base + 2.5), warios: 88 },
-    { minute: 20, noAction: Math.min(105, cp4Base + 5.2), warios: 86 },
-    { minute: 30, noAction: Math.min(105, cp4Base + 7.8), warios: 84 },
-    { minute: 45, noAction: 101, warios: 82 },
+    { minute: 0, noAction: Math.round(noActionDensity * 0.85), warios: Math.round(noActionDensity * 0.85) },
+    { minute: 10, noAction: Math.round(noActionDensity * 0.92), warios: Math.round(wariosDensity * 1.05) },
+    { minute: 20, noAction: Math.round(noActionDensity * 0.96), warios: Math.round(wariosDensity * 1.02) },
+    { minute: 30, noAction: noActionDensity, warios: wariosDensity },
+    { minute: 45, noAction: Math.round(noActionDensity * 1.04), warios: wariosDensity },
   ];
 
-  // Camp 6 Occupancy Timeline
   const camp6Timeline = [
-    { minute: 0, noAction: 120, warios: 120 },
-    { minute: 10, noAction: 124, warios: 110 },
-    { minute: 20, noAction: 128, warios: 98 },
-    { minute: 30, noAction: 131, warios: 90 },
-    { minute: 45, noAction: 134, warios: 85 },
+    { minute: 0, noAction: Math.round(noActionCamp * 0.88), warios: Math.round(noActionCamp * 0.88) },
+    { minute: 10, noAction: Math.round(noActionCamp * 0.94), warios: Math.round(wariosCamp * 1.1) },
+    { minute: 20, noAction: Math.round(noActionCamp * 0.98), warios: Math.round(wariosCamp * 1.04) },
+    { minute: 30, noAction: noActionCamp, warios: wariosCamp },
+    { minute: 45, noAction: Math.round(noActionCamp * 1.05), warios: wariosCamp },
   ];
 
-  // Medical Trauma Load Timeline
   const medicalTimeline = [
-    { minute: 0, noAction: 73, warios: 73 },
-    { minute: 10, noAction: 78, warios: 70 },
-    { minute: 20, noAction: 82, warios: 68 },
-    { minute: 30, noAction: 86, warios: 65 },
-    { minute: 45, noAction: 89, warios: 63 },
+    { minute: 0, noAction: Math.round(noActionMed * 0.8), warios: Math.round(noActionMed * 0.8) },
+    { minute: 10, noAction: Math.round(noActionMed * 0.88), warios: Math.round(wariosMed * 1.08) },
+    { minute: 20, noAction: Math.round(noActionMed * 0.94), warios: Math.round(wariosMed * 1.04) },
+    { minute: 30, noAction: noActionMed, warios: wariosMed },
+    { minute: 45, noAction: Math.round(noActionMed * 1.06), warios: wariosMed },
   ];
 
-  // Water Buffer Timeline (minutes remaining)
   const waterTimeline = [
-    { minute: 0, noAction: 34, warios: 34 },
-    { minute: 10, noAction: 24, warios: 50 },
-    { minute: 20, noAction: 14, warios: 65 },
-    { minute: 30, noAction: 4, warios: 74 },
-    { minute: 45, noAction: 0, warios: 78 },
+    { minute: 0, noAction: noActionWaterMin, warios: noActionWaterMin },
+    { minute: 10, noAction: Math.max(0, noActionWaterMin - 10), warios: Math.round(wariosWaterMin * 0.7) },
+    { minute: 20, noAction: Math.max(0, noActionWaterMin - 20), warios: Math.round(wariosWaterMin * 0.85) },
+    { minute: 30, noAction: Math.max(0, noActionWaterMin - 30), warios: Math.round(wariosWaterMin * 0.95) },
+    { minute: 45, noAction: Math.max(0, noActionWaterMin - 45), warios: wariosWaterMin },
   ];
 
   return [
     {
-      metricName: "CP4 Dive Ghat Density",
+      metricName: "Dive Ghat Chokepoint Density",
       category: "CROWD",
       unit: "%",
-      noActionValue: "101%",
-      wariosValue: "82%",
-      delta: "-19% Density Reduction",
+      noActionValue: `${noActionDensity}%`,
+      wariosValue: `${wariosDensity}%`,
+      delta: `-${noActionDensity - wariosDensity}% Density Relief`,
       isImprovement: true,
       timeline: cp4Timeline,
     },
     {
-      metricName: "Camp 6 (Saswad) Occupancy",
+      metricName: "Corridor Camp Peak Occupancy",
       category: "CAMP",
       unit: "%",
-      noActionValue: "134%",
-      wariosValue: "85%",
-      delta: "-49% Overcapacity Cleared",
+      noActionValue: `${noActionCamp}%`,
+      wariosValue: `${wariosCamp}%`,
+      delta: `-${noActionCamp - wariosCamp}% Overcapacity Cleared`,
       isImprovement: true,
       timeline: camp6Timeline,
     },
     {
-      metricName: "Medical Trauma Surge Load",
+      metricName: "Medical & Heat Stress Load",
       category: "MEDICAL",
       unit: "%",
-      noActionValue: "89%",
-      wariosValue: "63%",
-      delta: "-26% ICU Load Relief",
+      noActionValue: `${noActionMed}%`,
+      wariosValue: `${wariosMed}%`,
+      delta: `-${noActionMed - wariosMed}% Trauma Stress Relief`,
       isImprovement: true,
       timeline: medicalTimeline,
     },
     {
-      metricName: "Water Reserve Depletion",
+      metricName: "Water Reserve Depletion Window",
       category: "WATER",
       unit: "min",
-      noActionValue: "0 min (Depleted in 27m)",
-      wariosValue: "78 min (Fully Buffered)",
-      delta: "Shortage Prevented",
+      noActionValue: noActionWaterMin <= 10 ? `${noActionWaterMin} min (Critical)` : `${noActionWaterMin} min remaining`,
+      wariosValue: `${wariosWaterMin} min (Fully Buffered)`,
+      delta: `+${wariosWaterMin - noActionWaterMin}m Buffer Extended`,
       isImprovement: true,
       timeline: waterTimeline,
     },

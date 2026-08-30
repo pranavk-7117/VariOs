@@ -66,7 +66,45 @@ export interface Dindi {
   speedKmH?: number;
   route?: string;
   reroutedCampId?: string;
+  // Multi-batch pipeline tracking
+  batchNumber?: number;              // Assigned sequence: 1 = first to arrive, 2 = second, etc.
+  batchStatus?: "INCOMING" | "ARRIVED" | "DEPARTED";
+  departedFromCampId?: string;       // Set when volunteer confirms batch left the camp
+  arrivedAtCampId?: string;          // Set when batch is confirmed at camp
 }
+
+// Multi-batch sync plan for 3+ Dindis
+export interface DindiBatch {
+  batchNumber: number;
+  dindi: Dindi;
+  routeName: string;
+  routeType: "SHORTEST_PRIMARY" | "STAGGERED_BYPASS" | "HOLDING_LOOP";
+  routeWaypoints: string;
+  distanceKm: number;
+  paceKmH: number;
+  etaMinutes: number;
+  arrivalWindow: string;
+  departureWindow: string;
+  actionNote: string;
+}
+
+export interface ResourceSufficiencyResult {
+  campId: string;
+  campName: string;
+  incomingDindiName: string;
+  incomingPilgrims: number;
+  currentWaterPct: number;
+  currentFoodPct: number;
+  requiredWaterPct: number;
+  requiredFoodPct: number;
+  waterSufficient: boolean;
+  foodSufficient: boolean;
+  waterShortfallPct: number;
+  foodShortfallPct: number;
+  recommendation: string;
+  autoTasksGenerated: boolean;
+}
+
 
 export interface Camp {
   id: string;

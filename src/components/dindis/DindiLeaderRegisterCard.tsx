@@ -160,11 +160,11 @@ export default function DindiLeaderRegisterCard() {
         <div className="space-y-3">
           <div className="rounded-xl bg-white border border-orange-200 p-3 flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex-1">
-              <p className="text-xs font-bold text-orange-900">Voice Fill</p>
+              <p className="text-xs font-bold text-orange-900">Voice Auto-Fill (मराठी / हिंदी / English)</p>
               <p className="text-[11px] text-stone-600">
-                Say: "My name is Pranav, mandal name Dindi A, count 500" or Hindi/Marathi equivalents.
+                बोला: <em>&quot;माझं नाव प्रणव, मंडळ दिंडी १, संख्या ५००&quot;</em> / <em>&quot;मेरा नाम सचिन, मंडल दिंडी ए, संख्या २००&quot;</em> / <em>&quot;My name is Pranav, mandal Dindi A, count 500&quot;</em>
               </p>
-              {transcript && <p className="mt-1 text-[11px] text-emerald-700 font-medium">Heard: {transcript}</p>}
+              {transcript && <p className="mt-1 text-[11px] text-emerald-700 font-medium">🎙️ ऐकले / Heard: {transcript}</p>}
             </div>
             <button
               type="button"

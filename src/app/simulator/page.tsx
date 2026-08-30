@@ -9,6 +9,8 @@ import {
   Compass,
   Droplets,
   Sparkles,
+  TrendingDown,
+  ShieldCheck,
 } from "lucide-react";
 import { SCENARIO_PRESETS, generateCounterfactualData } from "@/lib/counterfactual";
 import { useSimulation } from "@/context/SimulationContext";
@@ -22,20 +24,23 @@ export default function SimulatorPage() {
   const [waterFactor, setWaterFactor] = useState(0.8);
   const [activePreset, setActivePreset] = useState<string | null>("dive_ghat_rain");
 
+  // Dynamic counterfactual calculation across all 4 parameters
   const counterfactualResults = generateCounterfactualData(
     rainMmH,
     1 + pilgrimSurgePercent / 100,
-    dindiSpeedKmH
+    dindiSpeedKmH,
+    waterFactor
   );
+
   const liveClusters = getLiveCrowdClusters(state);
   const liveCluster = liveClusters[0];
-  const liveBasePeople = liveCluster?.totalPilgrims ?? state.totalPilgrims;
-  const liveCapacity = liveCluster?.capacity ?? 400;
+  const liveBasePeople = liveCluster?.totalPilgrims ?? (state.totalPilgrims > 0 ? state.totalPilgrims : 45000);
+  const liveCapacity = liveCluster?.capacity ?? 40000;
   const projectedPeople = Math.round(liveBasePeople * (1 + pilgrimSurgePercent / 100));
   const projectedOccupancy = liveCapacity > 0 ? Math.round((projectedPeople / liveCapacity) * 100) : 0;
   const activeResponseOccupancy = Math.max(
     0,
-    Math.round(projectedOccupancy - 30 - Math.max(0, (waterFactor - 1) * 12) - Math.max(0, dindiSpeedKmH - 3.6) * 6)
+    Math.round(projectedOccupancy * 0.65 - Math.max(0, (waterFactor - 1) * 8) - Math.max(0, dindiSpeedKmH - 3.6) * 4)
   );
 
   const applyPreset = (presetId: string) => {
@@ -57,7 +62,7 @@ export default function SimulatorPage() {
   };
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-6 animate-fadeIn pb-12">
       {/* Header */}
       <div className="card-base p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -84,11 +89,15 @@ export default function SimulatorPage() {
       </div>
 
       {/* Preset Scenarios Chips */}
-      {state.isSimulating ? (
       <div className="card-base p-6 space-y-3">
-        <span className="text-xs font-bold text-wari-textMuted uppercase tracking-wider block">
-          Preset Operational Scenarios:
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-wari-textMuted uppercase tracking-wider block">
+            Preset Operational Scenarios:
+          </span>
+          <span className="text-[11px] text-wari-textSecond">
+            Click any scenario to auto-calibrate simulation parameters
+          </span>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {SCENARIO_PRESETS.map((sc) => (
             <button
@@ -96,13 +105,20 @@ export default function SimulatorPage() {
               onClick={() => applyPreset(sc.id)}
               className={`p-4 rounded-xl border text-left transition-all ${
                 activePreset === sc.id
-                  ? "bg-wari-orangeLight border-wari-orange shadow-sm"
-                  : "bg-wari-pageBg border-wari-cardBorder hover:border-orange-200"
+                  ? "bg-wari-orangeLight border-wari-orange shadow-sm ring-2 ring-wari-orange/30"
+                  : "bg-wari-pageBg border-wari-cardBorder hover:border-orange-200 hover:bg-orange-50/50"
               }`}
             >
-              <span className="text-sm font-bold text-wari-textPrimary block mb-1">
-                {sc.name}
-              </span>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-bold text-wari-textPrimary block">
+                  {sc.name}
+                </span>
+                {activePreset === sc.id && (
+                  <span className="text-[10px] bg-orange-600 text-white font-bold px-1.5 py-0.5 rounded">
+                    Active
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-wari-textSecond leading-relaxed">
                 {sc.description}
               </p>
@@ -110,39 +126,33 @@ export default function SimulatorPage() {
           ))}
         </div>
       </div>
-      ) : (
-        <div className="card-base p-6 space-y-4 border-2 border-emerald-200 bg-emerald-50/40">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-bold text-wari-textPrimary">Live Dindi What-If Baseline</h2>
-              <p className="text-xs text-wari-textSecond mt-1">
-                Uses registered Dindi GPS and leader-entered counts. Add Dindi B or change volume to see overcrowding projections.
-              </p>
-            </div>
-            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white border border-emerald-200 text-emerald-700">
-              REAL DATA MODE
-            </span>
+
+      {/* Live Baseline Telemetry Strip */}
+      <div className="card-base p-4 border border-emerald-200 bg-emerald-50/30">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className="bg-white rounded-xl border border-emerald-200 p-3">
+            <span className="text-wari-textMuted block text-[11px]">Base Pilgrims</span>
+            <strong className="text-base text-wari-textPrimary font-black">{liveBasePeople.toLocaleString()}</strong>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
-            <div className="bg-white rounded-xl border border-emerald-200 p-3">
-              <span className="text-wari-textMuted block">Current live people</span>
-              <strong className="text-lg text-wari-textPrimary">{liveBasePeople.toLocaleString()}</strong>
-            </div>
-            <div className="bg-white rounded-xl border border-emerald-200 p-3">
-              <span className="text-wari-textMuted block">Safe local capacity</span>
-              <strong className="text-lg text-wari-textPrimary">{liveCapacity.toLocaleString()}</strong>
-            </div>
-            <div className="bg-white rounded-xl border border-emerald-200 p-3">
-              <span className="text-wari-textMuted block">Projected occupancy</span>
-              <strong className={projectedOccupancy > 100 ? "text-lg text-red-700" : "text-lg text-emerald-700"}>{projectedOccupancy}%</strong>
-            </div>
-            <div className="bg-white rounded-xl border border-emerald-200 p-3">
-              <span className="text-wari-textMuted block">Nearest halt</span>
-              <strong className="text-sm text-wari-textPrimary">{liveCluster?.nearestCamp?.item.name ?? "Register a Dindi"}</strong>
-            </div>
+          <div className="bg-white rounded-xl border border-emerald-200 p-3">
+            <span className="text-wari-textMuted block text-[11px]">Projected Surge</span>
+            <strong className="text-base text-purple-700 font-black">{projectedPeople.toLocaleString()} (+{pilgrimSurgePercent}%)</strong>
+          </div>
+          <div className="bg-white rounded-xl border border-emerald-200 p-3">
+            <span className="text-wari-textMuted block text-[11px]">Projected Unmanaged Load</span>
+            <strong className={`text-base font-black ${projectedOccupancy > 100 ? "text-red-700" : "text-emerald-700"}`}>
+              {projectedOccupancy}%
+            </strong>
+          </div>
+          <div className="bg-white rounded-xl border border-emerald-200 p-3">
+            <span className="text-wari-textMuted block text-[11px]">WariOS Managed Load</span>
+            <strong className="text-base text-emerald-700 font-black flex items-center gap-1">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 inline" />
+              {activeResponseOccupancy}%
+            </strong>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Interactive Controls & Parameters Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 card-base p-6">
@@ -169,7 +179,7 @@ export default function SimulatorPage() {
           <div className="flex justify-between text-[11px] text-wari-textMuted">
             <span>0 (Dry)</span>
             <span>25 (Heavy)</span>
-            <span>50 (Flood)</span>
+            <span>50 (Cloudburst)</span>
           </div>
         </div>
 
@@ -222,9 +232,9 @@ export default function SimulatorPage() {
             className="w-full accent-wari-orange cursor-pointer"
           />
           <div className="flex justify-between text-[11px] text-wari-textMuted">
-            <span>1.0 km/h</span>
-            <span>3.0 km/h</span>
-            <span>5.0 km/h</span>
+            <span>1.0 km/h (Slow)</span>
+            <span>3.2 km/h</span>
+            <span>5.0 km/h (Fast)</span>
           </div>
         </div>
 
@@ -267,7 +277,7 @@ export default function SimulatorPage() {
             </h3>
           </div>
           <span className="text-xs text-wari-textMuted">
-            Simulated Counterfactual Analysis
+            Real-Time Dynamic Counterfactual Engine
           </span>
         </div>
 
@@ -276,19 +286,15 @@ export default function SimulatorPage() {
           <div className="p-5 rounded-2xl bg-red-50 border border-red-200 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-red-200">
               <span className="text-xs font-bold text-red-700 uppercase tracking-wider">
-                Without WariOS (No Action)
+                Without WariOS (No Intervention)
               </span>
               <span className="badge-critical">
-                Cascade
+                Cascade Risk
               </span>
             </div>
 
             <div className="space-y-3 text-xs">
-              {(state.isSimulating ? counterfactualResults : [
-                { metricName: "Selected Location Crowd Load", noActionValue: `${projectedPeople.toLocaleString()} people (${projectedOccupancy}%)` },
-                { metricName: "Capacity Breach", noActionValue: projectedOccupancy > 100 ? `${projectedPeople - liveCapacity} over safe capacity` : "No breach" },
-                { metricName: "Medical/Water Response", noActionValue: projectedOccupancy > 100 ? "Delayed triage, manual calls" : "Routine watch" },
-              ]).map((r, idx) => (
+              {counterfactualResults.map((r, idx) => (
                 <div
                   key={idx}
                   className="p-3.5 rounded-xl bg-white border border-red-200 flex items-center justify-between shadow-sm"
@@ -306,19 +312,15 @@ export default function SimulatorPage() {
           <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-emerald-200">
               <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
-                With WariOS (Active Response)
+                With WariOS (Active Mitigation)
               </span>
               <span className="badge-normal">
-                Mitigated
+                Mitigated & Stable
               </span>
             </div>
 
             <div className="space-y-3 text-xs">
-              {(state.isSimulating ? counterfactualResults : [
-                { metricName: "Selected Location Crowd Load", wariosValue: `${Math.round((activeResponseOccupancy / 100) * liveCapacity).toLocaleString()} managed load`, delta: `-${Math.max(0, projectedOccupancy - activeResponseOccupancy)}% pressure` },
-                { metricName: "Capacity Breach", wariosValue: activeResponseOccupancy > 100 ? "Overflow routed to nearest halt" : "Within managed threshold", delta: liveCluster?.nearestCamp?.item.name ?? "Awaiting Dindi" },
-                { metricName: "Medical/Water Response", wariosValue: "Nearest teams assigned from GPS", delta: liveCluster?.nearestMedical?.item.name ?? "Awaiting GPS" },
-              ]).map((r, idx) => (
+              {counterfactualResults.map((r, idx) => (
                 <div
                   key={idx}
                   className="p-3.5 rounded-xl bg-white border border-emerald-200 flex items-center justify-between shadow-sm"

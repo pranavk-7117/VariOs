@@ -155,9 +155,26 @@ export function useSpeechRecognition(): SpeechRecognitionResult {
 
       // Select matching voice if available
       const voices = window.speechSynthesis.getVoices();
-      const preferredVoice = voices.find((v) =>
-        v.lang.toLowerCase().startsWith(utterance.lang.toLowerCase().slice(0, 2))
+      const langPrefix = targetLang === "mr" ? "mr" : targetLang === "hi" ? "hi" : "en";
+      let preferredVoice = voices.find((v) =>
+        v.lang.toLowerCase().replace(/_/g, "-").startsWith(langPrefix)
       );
+
+      // If Marathi voice is not installed in the browser/OS, fall back to Hindi or Indian English voice
+      // which can phonetically pronounce Devanagari text accurately
+      if (!preferredVoice && targetLang === "mr") {
+        preferredVoice =
+          voices.find((v) => v.lang.toLowerCase().startsWith("hi")) ||
+          voices.find((v) => v.lang.toLowerCase().includes("in")) ||
+          voices.find((v) => v.lang.toLowerCase().startsWith("en-in"));
+      }
+
+      if (!preferredVoice && targetLang === "hi") {
+        preferredVoice =
+          voices.find((v) => v.lang.toLowerCase().includes("in")) ||
+          voices.find((v) => v.lang.toLowerCase().startsWith("en-in"));
+      }
+
       if (preferredVoice) {
         utterance.voice = preferredVoice;
       }

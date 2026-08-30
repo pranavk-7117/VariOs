@@ -22,7 +22,14 @@ const NUMBER_WORDS: Record<string, number> = {
   eight: 8,
   nine: 9,
   ten: 10,
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
   fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
   hundred: 100,
   thousand: 1000,
   एक: 1,
@@ -39,10 +46,24 @@ const NUMBER_WORDS: Record<string, number> = {
   नऊ: 9,
   नौ: 9,
   दहा: 10,
-  दस: 10,
+  वीस: 20,
+  तीस: 30,
+  चाळीस: 40,
   पन्नास: 50,
   पचास: 50,
+  साठ: 60,
+  सत्तर: 70,
+  ऐंशी: 80,
+  नव्वद: 90,
   शंभर: 100,
+  दोनशे: 200,
+  तीनशे: 300,
+  चारशे: 400,
+  पाचशे: 500,
+  सहाशे: 600,
+  सातशे: 700,
+  आठशे: 800,
+  नऊशे: 900,
   सौ: 100,
   हजार: 1000,
   ek: 1,
@@ -59,8 +80,29 @@ const NUMBER_WORDS: Record<string, number> = {
   nau: 9,
   daha: 10,
   das: 10,
+  vees: 20,
+  tees: 30,
+  chalis: 40,
+  pannas: 50,
+  pachas: 50,
+  saath: 60,
+  sattar: 70,
+  aishi: 80,
+  navvad: 90,
   shambhar: 100,
+  donse: 200,
+  donshe: 200,
+  teense: 300,
+  teenshe: 300,
+  charse: 400,
+  charshe: 400,
+  pachse: 500,
+  pachshe: 500,
+  paachshe: 500,
   sau: 100,
+  sho: 100,
+  show: 100,
+  so: 100,
   hajar: 1000,
   hazar: 1000,
 };
@@ -82,25 +124,34 @@ export function normalizeSpeechText(text: string): string {
 
 export function extractSpeechCount(text: string): string | null {
   const normalized = normalizeSpeechText(text).toLowerCase();
+  
+  // 1. Look for explicit digits first (e.g. "500", "1000", "50")
   const numeric = normalized.match(/\b\d{1,6}\b/);
   if (numeric) return numeric[0];
 
+  // 2. Look for composite words or word mappings
   const words = normalized.split(/\s+/);
   let total = 0;
   let current = 0;
-  for (const word of words) {
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
     const value = NUMBER_WORDS[word];
-    if (!value) continue;
+    if (value === undefined) continue;
+
     if (value === 100 || value === 1000) {
-      current = Math.max(1, current) * value;
+      current = (current === 0 ? 1 : current) * value;
       total += current;
       current = 0;
+    } else if (value >= 100) {
+      total += value;
     } else {
       current += value;
     }
   }
 
-  return total + current > 0 ? String(total + current) : null;
+  const result = total + current;
+  return result > 0 ? String(result) : null;
 }
 
 export function parseDindiRegistrationSpeech(rawText: string): {
@@ -113,44 +164,74 @@ export function parseDindiRegistrationSpeech(rawText: string): {
   let mandal = "";
   const count = extractSpeechCount(text) || "";
 
-  // 1. Leader matching in English, Marathi (Devanagari + Roman), Hindi (Devanagari + Roman)
-  const leaderRegex =
-    /(?:my name is|leader name is|leader is|leader name|leader|name is|मेरा नाम है|मेरा नाम|नाम है|माझे नाव आहे|माझे नाव|माझं नाव|माझ नाव|नाव आहे|नाव|mera naam hai|mera naam|mera name|maza nav aahe|maza nav|maza now aahe|maza now|mazha nav|maze nav|majhe nav|majha nav|naav)\s*[:=]?\s*([^,\.\n]+?)(?=\s+(?:mandal|dindi|count|pilgrim|people|devotees|मंडल|मंडळ|दिंडी|संख्या|लोक|वारकरी|sankhya|log|lok)|$)/i;
-  
-  const leaderMatch = text.match(leaderRegex);
-  if (leaderMatch && leaderMatch[1]) {
-    leader = leaderMatch[1].trim();
-  }
-
-  // 2. Mandal matching in English, Marathi (Devanagari + Roman), Hindi (Devanagari + Roman)
-  const mandalRegex =
-    /(?:mandal name is|mandal name|mandal is|mandal nav|mandal now|mandal naam|mandal|dindi name is|dindi name|dindi is|dindi nav|dindi now|dindi naam|dindi|मंडल नाम है|मंडल नाम|मंडल|मंडळ नाव आहे|मंडळ नाव|मंडळ|दिंडी नाव आहे|दिंडी नाव|दिंडी)\s*[:=]?\s*([^,\.\n]+?)(?=\s+(?:count|pilgrim|people|devotees|संख्या|गिनती|क्षमता|लोक|वारकरी|sankhya|log|lok)|\s+\d+|$)/i;
-
-  const mandalMatch = text.match(mandalRegex);
-  if (mandalMatch && mandalMatch[1]) {
-    mandal = mandalMatch[1].trim();
-  }
-
-  // 3. Fallbacks if neither structured tag was matched
-  if (!leader && !mandal) {
-    const parts = text.split(/,| and | और | आणि | & /i);
-    if (parts.length >= 2) {
-      leader = parts[0].trim();
-      mandal = parts[1].replace(/\b\d+\b/g, "").trim();
-    } else if (parts.length === 1 && !count) {
-      // If single sentence like "Pranav Sant Tukaram Dindi"
-      leader = parts[0].trim();
-    }
-  }
-
-  // Helper to strip copula words (aahe, ahe, hai, is, etc.) and number residue
+  // Helper to clean extracted field strings
   const cleanField = (s: string) =>
     s
-      .replace(/\b(aahe|ahe|आहे|hai|है|h|is|are|a)\b/gi, "")
-      .replace(/\b(count|people|devotees|pilgrims|संख्या|लोक|वारकरी|sankhya|log|lok)\b.*$/i, "")
+      .replace(/^(majha\s+naam|maza\s+naam|maze\s+naam|majhe\s+naam|mera\s+naam|mera\s+name|my\s+name\s+is|my\s+name|leader\s+name\s+is|leader\s+name|leader\s+is|name\s+is|name|माझे\s+नाव|माझं\s+नाव|माझ\s+नाव|माझा\s+नाव|माझा\s+नाम|माझे\s+नाम|मेरा\s+नाम|नाव\s+आहे|नाव|नाम)\s*[:=]?\s*/gi, "")
+      .replace(/^(mandal\s+name\s+is|mandal\s+name|mandal\s+is|mandal|mandala|dindi\s+name\s+is|dindi\s+name|dindi\s+is|dindi|मंडळ\s+नाव|मंडळ|मंडल\s+नाम|मंडल|दिंडी\s+नाव|दिंडी)\s*[:=]?\s*/gi, "")
+      .replace(/\b(aahe|ahe|आहे|hai|है|h|is|are|a|show|sho|sau|so)\b/gi, " ")
+      .replace(/\b(count|people|devotees|pilgrims|संख्या|लोक|वारकरी|sankhya|log|lok|varkari)\b.*$/i, "")
       .replace(/\b\d+\b/g, "")
       .replace(/^[,\.\-\:\s]+|[,\.\-\:\s]+$/g, "")
+      .replace(/\s+/g, " ")
       .trim();
+
+  // 1. Leader matching in English, Marathi (Devanagari + Roman), Hindi (Devanagari + Roman)
+  const leaderPrefixes = [
+    "my name is", "leader name is", "leader is", "leader name", "leader", "name is",
+    "मेरा नाम है", "मेरा नाम", "नाम है", "नाम",
+    "माझे नाव आहे", "माझे नाव", "माझं नाव", "माझ नाव", "माझा नाम", "माझे नाम", "माझ नाम", "नाव आहे", "नाव",
+    "mera naam hai", "mera naam", "mera name", "mera naav",
+    "majha naam", "majha name", "majha naav", "majha nav", "majha now",
+    "maza naam", "maza name", "maza naav", "maza nav", "maza now",
+    "maze naam", "maze naav", "maze nav", "majhe naam", "majhe naav", "majhe nav",
+    "naav", "naam"
+  ];
+
+  const mandalPrefixes = [
+    "mandal name is", "mandal name", "mandal is", "mandal nav", "mandal now", "mandal naam", "mandal", "mandala",
+    "dindi name is", "dindi name", "dindi is", "dindi nav", "dindi now", "dindi naam", "dindi",
+    "मंडल नाम है", "मंडल नाम", "मंडल",
+    "मंडळ नाव आहे", "मंडळ नाव", "मंडळ",
+    "दिंडी नाव आहे", "दिंडी नाव", "दिंडी"
+  ];
+
+  const countPrefixes = [
+    "count is", "count", "people count", "pilgrim count", "devotees count", "pilgrims", "people", "devotees",
+    "संख्या आहे", "संख्या", "गिनती", "क्षमता", "लोक", "वारकरी",
+    "sankhya aahe", "sankhya", "log", "lok", "varkari"
+  ];
+
+  const leaderPattern = new RegExp(
+    `(?:${leaderPrefixes.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\s*[:=]?\\s*([^,\\.\\n]+?)(?=\\s+(?:${[...mandalPrefixes, ...countPrefixes].map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})|\\s+\\d+|$)`,
+    "i"
+  );
+
+  const mandalPattern = new RegExp(
+    `(?:${mandalPrefixes.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\s*[:=]?\\s*([^,\\.\\n]+?)(?=\\s+(?:${countPrefixes.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})|\\s+\\d+|$)`,
+    "i"
+  );
+
+  const leaderMatch = text.match(leaderPattern);
+  if (leaderMatch && leaderMatch[1]) {
+    leader = cleanField(leaderMatch[1]);
+  }
+
+  const mandalMatch = text.match(mandalPattern);
+  if (mandalMatch && mandalMatch[1]) {
+    mandal = cleanField(mandalMatch[1]);
+  }
+
+  // 3. Fallbacks if one or both tags were omitted
+  if (!leader || !mandal) {
+    const parts = text.split(/,| and | और | आणि | & /i);
+    if (parts.length >= 2) {
+      if (!leader) leader = cleanField(parts[0]);
+      if (!mandal) mandal = cleanField(parts[1]);
+    } else if (parts.length === 1 && !count) {
+      if (!leader) leader = cleanField(parts[0]);
+    }
+  }
 
   leader = cleanField(leader);
   mandal = cleanField(mandal);

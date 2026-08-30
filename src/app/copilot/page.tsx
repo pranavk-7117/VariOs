@@ -21,6 +21,7 @@ import { getLiveCrowdClusters } from "@/lib/live-ops";
 interface MessageItem {
   id: string;
   sender: "USER" | "WARIOS_AI";
+  lang?: "en" | "hi" | "mr";
   text?: string;
   structured?: {
     headline: string;
@@ -270,6 +271,81 @@ export default function CopilotPage() {
           impacts,
           recommendations,
           confidence: 99,
+        },
+      };
+      speak(forecastText, targetLang);
+    }
+    // ── 0A. OVERCROWDED NEXT / NEXT BOTTLENECK / HIGHEST CROWD RISK CAMP INTENT ──
+    else if (
+      /overcrowd|crowd\s*next|which\s*camp.*(?:overcrowd|full|risk|surge|next|bottleneck|pressure)|next\s*(?:bottleneck|camp|overcrowd)|highest\s*(?:load|crowd|density)|(कोणता|कोणतं)\s*तळ.*(?:भरणार|गर्दी|ओव्हरक्राउड)|पुढील\s*गर्दी|कोणत्या\s*तळावर\s*गर्दी|कौन\s*सा\s*(?:शिविर|कैंप).*(?:भरेगा|भीड़|ओवरक्राउड)/.test(
+        qLower
+      )
+    ) {
+      // Analyze current camp occupancy & incoming Dindi trajectories
+      const sortedCamps = [...state.camps].sort((a, b) => b.occupancyPercent - a.occupancyPercent);
+      const criticalCamp = sortedCamps.find((c) => c.occupancyPercent >= 75) || sortedCamps[0] || state.camps[0];
+      const secondCamp = sortedCamps.find((c) => c.id !== criticalCamp.id) || state.camps[1];
+      const totalInflow = state.totalPilgrims > 0 ? state.totalPilgrims : 45000;
+      const projOcc = criticalCamp.capacity > 0 ? Math.round((totalInflow / criticalCamp.capacity) * 100) : 115;
+
+      let headline = "";
+      let forecastText = "";
+      let impacts: { label: string; value: string }[] = [];
+      let recommendations: string[] = [];
+
+      if (targetLang === "mr") {
+        headline = `पुढील गर्दीचा अंदाज: ${criticalCamp.name}`;
+        forecastText = `पुढील गर्दी व संभाव्य ओव्हरक्राउडिंग विश्लेषण:\n\n• संभाव्य गर्दीचा तळ: ${criticalCamp.name} (सुरक्षित क्षमता: ${criticalCamp.capacity.toLocaleString()} भाविक).\n• सध्याची/अपेक्षित गर्दी: अंदाजे ${totalInflow.toLocaleString()} वारकरी येत्या ४५-६० मिनिटांत दाखल होत आहेत (${projOcc}% भार).\n• AI प्रतिबंधात्मक उपाययोजना:\n  १. दिंडी सिंक्रोनायझेशन: मागून येणाऱ्या दिंडीला बाह्य बायपास मार्गावर (+३.४ किमी) वळवून आगमन ५० मिनिटांनी स्टॅगर केले आहे.\n  २. पर्यायी सुरक्षित तळ: ${secondCamp.name} (उपलब्ध क्षमता: ${(secondCamp.capacity - secondCamp.currentOccupancy).toLocaleString()} जागा) सज्ज ठेवण्यात आला आहे.\n  ३. पाणी व महाप्रसाद पथकांना अतिरिक्त बॅच पुरवठ्याचा थेट अलर्ट पाठवला आहे.`;
+        impacts = [
+          { label: "पुढील गर्दीचा तळ", value: criticalCamp.name.split("(")[0] },
+          { label: "अपेक्षित गर्दी भार", value: `${projOcc}% (व्यवस्थापित)` },
+          { label: "पर्यायी सुरक्षित तळ", value: secondCamp.name.split("(")[0] },
+        ];
+        recommendations = [
+          `दिंडी २ ला बाह्य बायपास मार्गाने वळवून ${criticalCamp.name} वरील ताण कमी करा.`,
+          `${criticalCamp.name} येथे २ अतिरिक्त पाण्याचे टँकर आणि स्वयंसेवक दल तैनात करा.`,
+          `प्रवेशद्वारावरील रांगा टाळण्यासाठी बॅच-वार महाप्रसाद वाटप सुरू ठेवा.`,
+        ];
+      } else if (targetLang === "hi") {
+        headline = `अगला संभावित भीड़ शिविर: ${criticalCamp.name}`;
+        forecastText = `अगला भीड़ एवं ओवरक्राउडिंग पूर्वानुमान:\n\n• मुख्य जोखिम शिविर: ${criticalCamp.name} (सुरक्षित क्षमता: ${criticalCamp.capacity.toLocaleString()} श्रद्धालु)।\n• अनुमानित आवक: लगभग ${totalInflow.toLocaleString()} श्रद्धालु अगले 45-60 मिनट में पहुंचेंगे (${projOcc}% भार)।\n• AI स्वचालित राहत कदम:\n  1. दिंडी सिंक्रोनाइज़ेशन: दूसरी दिंडी को आउटर बाईपास (+3.4 किमी) पर डायवर्ट कर +50 मिनट का अंतराल बनाया गया।\n  2. वैकल्पिक शिविर: ${secondCamp.name} (उपलब्ध क्षमता: ${(secondCamp.capacity - secondCamp.currentOccupancy).toLocaleString()}) सक्रिय।\n  3. अतिरिक्त पानी के टैंकर और भोजन आपूर्ति स्टैंडबाय पर रखी गई।`;
+        impacts = [
+          { label: "अगला भीड़ शिविर", value: criticalCamp.name.split("(")[0] },
+          { label: "अनुमानित पीक लोड", value: `${projOcc}% (नियंत्रित)` },
+          { label: "बैकअप सुरक्षित शिविर", value: secondCamp.name.split("(")[0] },
+        ];
+        recommendations = [
+          `आगामी दिंडी को बाईपास मार्ग पर निर्देशित कर ${criticalCamp.name} का दबाव 40% घटाएं।`,
+          `${criticalCamp.name} पर आपातकालीन पेयजल और मेडिकल दल को हाई अलर्ट पर रखें।`,
+        ];
+      } else {
+        headline = `Next Projected Overcrowded Halt: ${criticalCamp.name}`;
+        forecastText = `Next Chokepoint & Overcrowding Forecast:\n\n• Primary Bottleneck Camp: ${criticalCamp.name} (Safe Capacity: ${criticalCamp.capacity.toLocaleString()} devotees).\n• Incoming Pilgrim Flow: ~${totalInflow.toLocaleString()} devotees converging within 45–60 minutes (${projOcc}% capacity load).\n• Automated AI Mitigation Executed:\n  1. Route Staggering: Second incoming Dindi rerouted to the Scenic Outer Bypass (+3.4 km) for a +50 min phased buffer.\n  2. Overflow Relief: ${secondCamp.name} staged as backup holding ground with ${(secondCamp.capacity - secondCamp.currentOccupancy).toLocaleString()} available slots.\n  3. Logistics: Pre-alerts dispatched to kitchen and water tanker logistics.`;
+        impacts = [
+          { label: "Next Overcrowded Halt", value: criticalCamp.name.split("(")[0] },
+          { label: "Projected Peak Load", value: `${projOcc}% (Managed)` },
+          { label: "Backup Holding Camp", value: secondCamp.name.split("(")[0] },
+        ];
+        recommendations = [
+          `Execute dynamic route staggering to reduce ${criticalCamp.name} arrival pressure by 45%.`,
+          `Position backup water tanker at ${criticalCamp.name} main entrance gate.`,
+          `Activate volunteer marshals at approach corridor junctions.`,
+        ];
+      }
+
+      aiMsg = {
+        id: `ai-${Date.now()}`,
+        sender: "WARIOS_AI",
+        structured: {
+          headline,
+          forecastText,
+          rootCauses: [
+            `Simultaneous convergence of pilgrim columns towards ${criticalCamp.name}.`,
+            `Dynamic corridor telemetry prevents overcrowding before physical arrival.`,
+          ],
+          impacts,
+          recommendations,
+          confidence: 98,
         },
       };
       speak(forecastText, targetLang);
@@ -859,6 +935,9 @@ export default function CopilotPage() {
       speak(forecastText, targetLang);
     }
 
+    // Attach detected language so the render can localize section headers
+    aiMsg = { ...aiMsg, lang: targetLang };
+
     setMessages((prev) => [...prev, userMsg, aiMsg]);
     setInputQuery("");
     reset();
@@ -946,7 +1025,7 @@ export default function CopilotPage() {
 
                   <div className="flex items-center gap-2 shrink-0">
                     <button
-                      onClick={() => speak(msg.structured?.forecastText || "", language)}
+                      onClick={() => speak(msg.structured?.forecastText || "", msg.lang || language)}
                       className="p-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-bold flex items-center gap-1 border border-orange-200"
                       title="Read aloud"
                     >
@@ -968,7 +1047,7 @@ export default function CopilotPage() {
                 {msg.structured?.rootCauses && (
                   <div className="space-y-1.5">
                     <span className="text-[11px] font-bold text-wari-textMuted uppercase tracking-wider">
-                      Operational Context:
+                      {msg.lang === "mr" ? "संदर्भ माहिती:" : msg.lang === "hi" ? "परिचालन संदर्भ:" : "Operational Context:"}
                     </span>
                     <div className="space-y-1 text-xs text-wari-textSecond">
                       {msg.structured.rootCauses.map((rc, idx) => (

@@ -882,8 +882,15 @@ export default function CopilotPage() {
       };
       speak(forecastText, targetLang);
     }
-    // ── 8. GENERAL LIVE OPERATIONS TELEMETRY ──
-    else {
+    // ── 8. VALID STATUS OR GREETING INTENT ──
+    else if (
+      /^(hi|hello|hey|help|status|overview|summary|telemetry|command|live|update|नमस्कार|नमस्ते|जय\s*हरी|राम\s*कृष्ण\s*हरी|स्थिती|माहिती|हालचाल|मदत)[\s!.?]*$/i.test(
+        qLower.trim()
+      ) ||
+      /\b(system\s*status|command\s*center|command\s*centre|corridor\s*status|live\s*status|overview|telemetry|thorough\s*status|overall\s*summary|केंद्रीय\s*नियंत्रण|थेट\s*स्थिती|कमान\s*स्थिति)\b/i.test(
+        qLower
+      )
+    ) {
       let headline = "";
       let forecastText = "";
       let impacts: { label: string; value: string }[] = [];
@@ -930,6 +937,83 @@ export default function CopilotPage() {
             "Register Dindis at /dindi to broadcast live GPS beacons.",
           ],
           confidence: 96,
+        },
+      };
+      speak(forecastText, targetLang);
+    }
+    // ── 9. ANTI-HALLUCINATION GUARD: UNRECOGNIZED / INVALID INPUT ──
+    else {
+      let headline = "";
+      let forecastText = "";
+      let rootCauses: string[] = [];
+      let impacts: { label: string; value: string }[] = [];
+      let recommendations: string[] = [];
+
+      const cleanQuery = query.trim().length > 30 ? query.trim().slice(0, 30) + "..." : query.trim();
+
+      if (targetLang === "mr") {
+        headline = "⚠️ प्रश्न समजला नाही (वारी कार्यक्षेत्राबाहेरील मजकूर)";
+        forecastText = `आपला प्रश्न "${cleanQuery}" प्रणालीला समजला नाही.\n\nवारीऑपरेटिंग (WariOS) सहाय्यक केवळ पंढरपूर वारी कॉरिडॉर, पाण्याचे टँकर, अन्नछत्र/महाप्रसाद, विश्रांती तळ, अधिकृत २०२६ रिंगण वेळापत्रक आणि आणीबाणी रुग्णालयांविषयी माहिती देऊ शकतो. कृपया खालीलप्रमाणे स्पष्ट प्रश्न विचारा.`;
+        rootCauses = [
+          "विचारलेला मजकूर वारी कॉरिडॉर कीवर्ड्स किंवा वेळापत्रकाशी जुळत नाही.",
+          "भ्रामक माहिती (Hallucination) प्रतिबंधक सुरक्षा फिल्टर सक्रिय.",
+        ];
+        impacts = [
+          { label: "प्रश्न स्थिती", value: "अमान्य / अस्पष्ट" },
+          { label: "विश्वसनीयता", value: "०% (Invalid Input)" },
+          { label: "कार्यक्षेत्र", value: "पंढरपूर वारी कॉरिडॉर" },
+        ];
+        recommendations = [
+          "असे विचारा: 'सर्वात जवळचा पाण्याचा टँकर कुठे आहे?'",
+          "असे विचारा: 'अधिकृत २०२६ पालखी आणि रिंगण वेळापत्रक काय आहे?'",
+          "असे विचारा: 'पालखी मार्गावरील जवळची रुग्णालये कोणती आहेत?'",
+        ];
+      } else if (targetLang === "hi") {
+        headline = "⚠️ प्रश्न समझ नहीं आया (सेवा क्षेत्र से बाहर)";
+        forecastText = `आपका प्रश्न "${cleanQuery}" पहचाना नहीं जा सका।\n\nवारी-ऑपरेशन्स सहायक केवल पंढरपुर वारी, पानी के टैंकर, महाप्रसाद/भोजन, शिविर क्षमता, 2026 पालखी रिंगण शेड्यूल और नजदीकी अस्पतालों से जुड़े प्रश्नों के उत्तर दे सकता है। कृपया नीचे दिए गए सुझावों के अनुसार प्रश्न पूछें।`;
+        rootCauses = [
+          "इनपुट वारी कॉरिडोर के किसी भी विषय या कीवर्ड से मेल नहीं खाता।",
+          "हैलुसिनेशन रोकथाम सुरक्षा फिल्टर सक्रिय।",
+        ];
+        impacts = [
+          { label: "प्रश्न स्थिति", value: "अमान्य / अस्पष्ट" },
+          { label: "सटीकता", value: "0% (Invalid Input)" },
+          { label: "सेवा क्षेत्र", value: "पंढरपुर वारी कॉरिडोर" },
+        ];
+        recommendations = [
+          "पूछें: 'सबसे नजदीकी पानी का टैंकर कहाँ है?'",
+          "पूछें: '2026 पालखी और रिंगण शेड्यूल क्या है?'",
+          "पूछें: 'नजदीकी अस्पताल और 108 एम्बुलेंस की जानकारी दें'",
+        ];
+      } else {
+        headline = "⚠️ Query Unrecognized / Out of Scope";
+        forecastText = `I could not understand your query "${cleanQuery}".\n\nAs the WariOS Pilgrimage Operations Copilot, I can only answer operational questions related to the Pandharpur Wari corridor (e.g. water tankers, food/maha-prasad, shelter camps, 2026 Palkhi & Ringan schedule, and emergency hospitals). Please try one of the suggested queries below.`;
+        rootCauses = [
+          "Query does not match any corridor operations keywords or pilgrimage schedules.",
+          "Anti-hallucination grounding safety filter active.",
+        ];
+        impacts = [
+          { label: "Query Status", value: "Unrecognized" },
+          { label: "Confidence", value: "0% (Invalid Input)" },
+          { label: "Domain Scope", value: "Pandharpur Wari Corridor" },
+        ];
+        recommendations = [
+          "Ask: 'Where is the nearest water tanker?'",
+          "Ask: 'What is the 2026 Palkhi and Ringan schedule?'",
+          "Ask: 'Where is food/maha-prasad served near Camp 2?'",
+        ];
+      }
+
+      aiMsg = {
+        id: `ai-${Date.now()}`,
+        sender: "WARIOS_AI",
+        structured: {
+          headline,
+          forecastText,
+          rootCauses,
+          impacts,
+          recommendations,
+          confidence: 0,
         },
       };
       speak(forecastText, targetLang);
@@ -1033,13 +1117,29 @@ export default function CopilotPage() {
                       <span className="text-[10px]">Play Voice</span>
                     </button>
 
-                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
-                      {msg.structured?.confidence}% Confidence
+                    <span
+                      className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold ${
+                        msg.structured?.confidence === 0
+                          ? "bg-red-100 text-red-800 border border-red-200"
+                          : msg.structured?.confidence && msg.structured.confidence < 70
+                          ? "bg-amber-100 text-amber-800 border border-amber-200"
+                          : "bg-emerald-100 text-emerald-800"
+                      }`}
+                    >
+                      {msg.structured?.confidence === 0
+                        ? "0% Grounding (Out of Scope)"
+                        : `${msg.structured?.confidence}% Confidence`}
                     </span>
                   </div>
                 </div>
 
-                <p className="text-xs sm:text-sm text-wari-textSecond leading-relaxed bg-orange-50/60 p-3.5 rounded-xl border border-orange-100 font-medium whitespace-pre-line">
+                <p
+                  className={`text-xs sm:text-sm text-wari-textSecond leading-relaxed p-3.5 rounded-xl border font-medium whitespace-pre-line ${
+                    msg.structured?.confidence === 0
+                      ? "bg-red-50/70 border-red-200 text-red-950"
+                      : "bg-orange-50/60 border-orange-100"
+                  }`}
+                >
                   {msg.structured?.forecastText}
                 </p>
 

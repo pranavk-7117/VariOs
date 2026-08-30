@@ -132,33 +132,35 @@ export const DindiSponsorPortal: React.FC = () => {
     const selectedCamp = state.camps.find((c) => c.id === form.targetCampId) ?? state.camps[0];
     const selectedDindi = state.dindis.find((d) => d.id === form.targetDindiId);
 
-    const payload = {
-      sponsorshipId: nowId,
-      sponsorName: form.sponsorName,
-      organization: form.organization || "Individual Devotee / Seva Kari",
-      email: form.email,
-      phone: form.phone,
-      sevaCategory: form.category,
-      targetCamp: selectedCamp.name,
-      targetDindi: selectedDindi ? selectedDindi.name : "All Converging Dindis / General Pilgrims",
-      quantityDetails: form.quantityDetails,
-      dateOfSeva: form.dateOfSeva,
-      remarks: form.remarks || "No specific instructions",
-      submittedAt: new Date().toLocaleString(),
+    const emailPayload = {
+      _subject: `🙏 [WariOS Seva] ${form.category} Sponsorship from ${form.sponsorName}`,
+      _replyto: form.email,
+      _template: "table",
+      _captcha: "false",
+      Sponsorship_ID: nowId,
+      Sponsor_Name: form.sponsorName,
+      Organization_or_Trust: form.organization || "Individual Devotee / Seva Kari",
+      WhatsApp_Phone: form.phone,
+      Sponsor_Email: form.email,
+      Seva_Category: form.category,
+      Target_Camp_Sector: selectedCamp.name,
+      Target_Dindi: selectedDindi ? selectedDindi.name : "All Converging Dindis / General Pilgrims",
+      Quantity_or_Amount_Pledged: form.quantityDetails,
+      Date_of_Seva: form.dateOfSeva,
+      Special_Remarks: form.remarks || "No specific instructions",
+      Submitted_At: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
     };
 
     try {
-      // 1. Send via Formspree if endpoint is provided
-      if (formspreeEndpoint) {
-        await fetch(formspreeEndpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify(payload),
-        }).catch((err) => console.warn("[WariOS] Formspree dispatch fallback", err));
-      }
+      // 1. Dispatch email directly to pranavk7117@gmail.com via FormSubmit AJAX
+      await fetch("https://formsubmit.co/ajax/pranavk7117@gmail.com", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(emailPayload),
+      }).catch((err) => console.warn("[WariOS] FormSubmit dispatch fallback", err));
 
       // 2. Add real-time event in WariOS Simulation & Volunteer stream
       addEventLog({
@@ -599,12 +601,12 @@ export const DindiSponsorPortal: React.FC = () => {
               </div>
             </div>
 
-            {/* Formspree Dispatch Notice */}
+            {/* Dispatch Notice */}
             <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl flex items-center justify-between text-[11px] text-amber-900">
               <div className="flex items-center gap-2">
                 <span>📧</span>
                 <span>
-                  Details are instantly logged into WariOS live operations &amp; emailed to volunteer leads via Formspree.
+                  Details are instantly logged into WariOS live operations &amp; emailed directly to <strong>pranavk7117@gmail.com</strong>.
                 </span>
               </div>
               <span className="font-mono text-[10px] font-bold text-amber-700 shrink-0">

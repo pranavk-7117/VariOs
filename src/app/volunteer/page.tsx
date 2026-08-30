@@ -26,7 +26,7 @@ import { parseReportIntent } from "@/lib/speech-intents";
 import { VolunteerTask } from "@/lib/types";
 
 export default function VolunteerPortal() {
-  const { state, addEventLog, reportVolunteerIncident, updateVolunteerTask } = useSimulation();
+  const { state, addEventLog, reportVolunteerIncident, updateVolunteerTask, markBatchDeparted } = useSimulation();
   const { coords } = useLiveGps();
   const { transcript, isListening, isSupported, startListening, reset } = useSpeechRecognition();
 
@@ -404,6 +404,39 @@ export default function VolunteerPortal() {
                         Reject / Issue Alert
                       </button>
                     </div>
+
+                    {/* Batch Departure Action Button */}
+                    {(() => {
+                      const matchedDindi = state.dindis.find(
+                        (d) => task.title.includes(d.name) || (d.passcode && task.title.includes(d.passcode))
+                      );
+                      const isDeparted = matchedDindi?.batchStatus === "DEPARTED";
+
+                      if (isVerified && matchedDindi && !isDeparted && task.campId) {
+                        return (
+                          <div className="pt-2 border-t border-emerald-200">
+                            <button
+                              onClick={() => markBatchDeparted(matchedDindi.id, task.campId!)}
+                              className="w-full py-2.5 px-4 rounded-xl bg-purple-700 hover:bg-purple-800 active:scale-95 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-2 transition-all"
+                            >
+                              <span>🚀 Confirm {matchedDindi.name} Departed → Auto-Check Resource Stock for Next Batch</span>
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      if (isDeparted && matchedDindi) {
+                        return (
+                          <div className="pt-2 border-t border-emerald-200 flex items-center justify-center">
+                            <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full border border-emerald-200">
+                              ✅ {matchedDindi.name} Confirmed Departed from {task.campName}
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      return null;
+                    })()}
                   </div>
                 );
               })}

@@ -249,7 +249,32 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
 
   const resetAll = useCallback(() => {
     setLiveDindis([]);
-    setState(LIVE_INITIAL_STATE);
+    setState({
+      ...LIVE_INITIAL_STATE,
+      volunteerTasks: [],
+      alerts: [],
+      tankers: LIVE_INITIAL_STATE.tankers.map((t) => ({ ...t, status: "AVAILABLE" as const })),
+      foodSupplies: LIVE_INITIAL_STATE.foodSupplies?.map((f) => ({ ...f, status: "AVAILABLE" as const })),
+      sanitationCrews: LIVE_INITIAL_STATE.sanitationCrews.map((s) => ({ ...s, status: "AVAILABLE" as const })),
+      camps: LIVE_INITIAL_STATE.camps.map((c) => ({
+        ...c,
+        currentOccupancy: 0,
+        occupancyPercent: 0,
+        waterStockPercent: 100,
+        foodStockPercent: 100,
+        status: "NORMAL" as const,
+      })),
+      events: [
+        {
+          id: `EV-RESET-${Date.now()}`,
+          timestamp: new Date().toLocaleTimeString(),
+          eventType: "TELEMETRY_UPDATE" as const,
+          severity: "INFO" as const,
+          source: "System Reset",
+          description: "All custom Dindi data, tasks, and alerts cleared. All pages reset to nominal baseline.",
+        },
+      ],
+    });
     clearLocalLiveDindis().catch((error) => console.warn("[WariOS] Failed to clear local live data", error));
   }, []);
 
@@ -1277,11 +1302,71 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     setState((prev) => {
       const target = prev.dindis.find((d) => d.id === dindiId);
       const remaining = prev.dindis.filter((d) => d.id !== dindiId);
+      const remainingCustom = remaining.filter((d) => d.isCustomRegistered);
+      const targetName = target?.name ?? dindiId;
+      const targetPasscode = target?.passcode ?? "";
+
+      // 1. Remove volunteer tasks specifically created for or referencing the deleted Dindi
+      let updatedTasks = prev.volunteerTasks.filter((t) => {
+        if (target && (t.title.includes(targetName) || (targetPasscode && t.title.includes(targetPasscode)) || t.remarks?.includes(targetName))) {
+          return false;
+        }
+        return true;
+      });
+
+      // 2. Remove alerts specifically created for or referencing the deleted Dindi
+      let updatedAlerts = prev.alerts.filter((a) => {
+        if (target && (a.title.includes(targetName) || a.cause.includes(targetName) || (targetPasscode && a.cause.includes(targetPasscode)))) {
+          return false;
+        }
+        return true;
+      });
+
+      // 3. If remaining custom Dindis is < 2, wipe any multi-dindi batch sync tasks and alerts
+      if (remainingCustom.length < 2) {
+        updatedTasks = updatedTasks.filter((t) => !t.id.startsWith("TASK-SYNC-BATCH"));
+        updatedAlerts = updatedAlerts.filter((a) => !a.id.startsWith("ALT-SYNC-"));
+      } else {
+        // If remainingCustom >= 2, recompute sync plan for the new remaining Dindis
+        const plan = computeDindiSyncPlan(remaining, prev.camps);
+        if (plan) {
+          // Remove old sync batch tasks
+          updatedTasks = updatedTasks.filter((t) => !t.id.startsWith("TASK-SYNC-BATCH"));
+          updatedAlerts = updatedAlerts.filter((a) => !a.id.startsWith("ALT-SYNC-"));
+
+          const nowId = Date.now();
+          const targetCampName = plan.targetCamp.name;
+
+          // Add clean new tasks for each batch in the new plan
+          plan.batches.forEach((b) => {
+            updatedTasks.push({
+              id: `TASK-SYNC-BATCH${b.batchNumber}-${nowId}`,
+              campId: plan.targetCamp.id,
+              campName: targetCampName,
+              volunteerId: `VOL-SYNC-0${b.batchNumber}`,
+              volunteerName: b.batchNumber === 1 ? "Corridor Seva Desk" : `Bypass Marshal Desk ${b.batchNumber - 1}`,
+              title: `Prepare Batch ${b.batchNumber} Arrival: ${b.dindi.name} (~${b.dindi.pilgrimCount.toLocaleString()} pilgrims via ${b.routeName}, ETA ~${b.etaMinutes}m)`,
+              type: b.batchNumber === 1 ? "FOOD_SUPPLY" : "HALT",
+              etaMinutes: b.etaMinutes,
+              status: "ASSIGNED",
+              remarks: b.actionNote,
+              createdAt: timeString,
+              updatedAt: timeString,
+            });
+          });
+        }
+      }
+
+      // Recompute camps & occupancy from the remaining dindis
+      const recomputedCamps = !prev.isSimulating ? computeLiveCamps(remaining, LIVE_SUPPORT_CAMPS, updatedTasks) : prev.camps;
+
       return {
         ...prev,
         dindis: remaining,
         totalPilgrims: remaining.reduce((sum, d) => sum + d.pilgrimCount, 0),
-        camps: !prev.isSimulating ? computeLiveCamps(remaining, LIVE_SUPPORT_CAMPS, prev.volunteerTasks) : prev.camps,
+        camps: recomputedCamps,
+        volunteerTasks: updatedTasks,
+        alerts: updatedAlerts,
         events: [
           {
             id: `EV-DEL-${Date.now()}`,
@@ -1289,7 +1374,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
             eventType: "TELEMETRY_UPDATE" as const,
             severity: "INFO" as const,
             source: "Dindi Manager",
-            description: `Deleted Dindi: ${target?.name ?? dindiId} (${target?.passcode ?? ""})`,
+            description: `Deleted Dindi: ${targetName} (${targetPasscode}). Cleaned up associated volunteer tasks & alerts. Synchronized remaining Dindis.`,
           },
           ...prev.events,
         ],
@@ -1376,59 +1461,38 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
       const plan = computeDindiSyncPlan(prev.dindis, prev.camps, targetCampId);
       if (!plan) return prev;
 
+      const targetCampName = plan.targetCamp.name;
       const dindiA = plan.dindiShortRoute.dindi;
       const dindiB = plan.dindiLongRoute.dindi;
-      const targetCampName = plan.targetCamp.name;
 
+      // Update routes & speeds for all Dindis in the sync plan
       const updatedDindis = prev.dindis.map((d) => {
-        if (d.id === dindiA.id) {
+        const matchingBatch = plan.batches.find((b) => b.dindi.id === d.id);
+        if (matchingBatch) {
           return {
             ...d,
-            route: plan.dindiShortRoute.routeName,
-            speedKmH: plan.dindiShortRoute.paceKmH,
-          };
-        }
-        if (d.id === dindiB.id) {
-          return {
-            ...d,
-            route: plan.dindiLongRoute.routeName,
-            speedKmH: plan.dindiLongRoute.paceKmH,
+            route: matchingBatch.routeName,
+            speedKmH: matchingBatch.paceKmH,
           };
         }
         return d;
       });
 
-      // Advance tasks for volunteer and kitchen teams
-      const newTasks: VolunteerTask[] = [
-        {
-          id: `TASK-SYNC-BATCH1-${nowId}`,
-          campId: plan.targetCamp.id,
-          campName: targetCampName,
-          volunteerId: "VOL-SYNC-01",
-          volunteerName: "Corridor Seva Desk",
-          title: `Prepare Batch 1 Arrival: ${dindiA.name} (~${dindiA.pilgrimCount.toLocaleString()} pilgrims via Direct Corridor, ETA ~${plan.dindiShortRoute.etaMinutes}m)`,
-          type: "FOOD_SUPPLY",
-          etaMinutes: plan.dindiShortRoute.etaMinutes,
-          status: "ASSIGNED",
-          remarks: "Fast turnaround required. Clear resting zone before Batch 2 arrives.",
-          createdAt: timeString,
-          updatedAt: timeString,
-        },
-        {
-          id: `TASK-SYNC-BATCH2-${nowId}`,
-          campId: plan.targetCamp.id,
-          campName: targetCampName,
-          volunteerId: "VOL-SYNC-02",
-          volunteerName: "Bypass Marshal Desk",
-          title: `Prepare Batch 2 Staggered Arrival: ${dindiB.name} (~${dindiB.pilgrimCount.toLocaleString()} pilgrims via Outer Bypass, ETA ~${plan.dindiLongRoute.etaMinutes}m)`,
-          type: "HALT",
-          etaMinutes: plan.dindiLongRoute.etaMinutes,
-          status: "ASSIGNED",
-          remarks: `Stagger gap of +${plan.staggerDeltaMinutes} min guarantees zero camp overcrowding.`,
-          createdAt: timeString,
-          updatedAt: timeString,
-        },
-      ];
+      // Advance tasks for volunteer and kitchen teams for all batches
+      const newTasks: VolunteerTask[] = plan.batches.map((b) => ({
+        id: `TASK-SYNC-BATCH${b.batchNumber}-${nowId}`,
+        campId: plan.targetCamp.id,
+        campName: targetCampName,
+        volunteerId: `VOL-SYNC-0${b.batchNumber}`,
+        volunteerName: b.batchNumber === 1 ? "Corridor Seva Desk" : `Bypass Marshal Desk ${b.batchNumber - 1}`,
+        title: `Prepare Batch ${b.batchNumber} Arrival: ${b.dindi.name} (~${b.dindi.pilgrimCount.toLocaleString()} pilgrims via ${b.routeName}, ETA ~${b.etaMinutes}m)`,
+        type: b.batchNumber === 1 ? "FOOD_SUPPLY" : "HALT",
+        etaMinutes: b.etaMinutes,
+        status: "ASSIGNED",
+        remarks: b.actionNote,
+        createdAt: timeString,
+        updatedAt: timeString,
+      }));
 
       const newAlert: Alert = {
         id: `ALT-SYNC-${nowId}`,

@@ -228,16 +228,19 @@ export function computeDindiSyncPlan(
   const baseDistKm = nearest(sortedDindis[0].lat, sortedDindis[0].lng, camps)?.distanceKm ?? 4.2;
   const shortDistKm = Math.max(3.2, Math.round(baseDistKm * 10) / 10);
 
-  // Build N batches
-  const batches: import("./types").DindiBatch[] = sortedDindis.map((dindi, idx) => {
+  // Build N batches sequentially to avoid referencing batches before initialization
+  const batches: import("./types").DindiBatch[] = [];
+  for (let idx = 0; idx < sortedDindis.length; idx++) {
+    const dindi = sortedDindis[idx];
     const cfg = ROUTE_CONFIGS[Math.min(idx, ROUTE_CONFIGS.length - 1)];
     const distKm = Math.round((shortDistKm + cfg.extraDistKm) * 10) / 10;
     const pace = (dindi.speedKmH && dindi.speedKmH > 1 ? dindi.speedKmH : dindi.currentPaceKmH || 3.8) * cfg.paceMultiplier;
     const eta = Math.round((distKm / Math.max(pace, 1)) * 60);
-    const staggerMinutes = idx === 0 ? 0 : batches.slice(0, idx).reduce((s, b) => Math.max(s, b.etaMinutes), 0) + 55;
+    const staggerMinutes = idx === 0 ? 0 : batches.reduce((s, b) => Math.max(s, b.etaMinutes), 0) + 55;
     const effectiveEta = idx === 0 ? eta : staggerMinutes;
+    const batch1Eta = batches[0]?.etaMinutes ?? eta;
 
-    return {
+    batches.push({
       batchNumber: idx + 1,
       dindi,
       routeName: cfg.routeName,
@@ -248,15 +251,15 @@ export function computeDindiSyncPlan(
       etaMinutes: effectiveEta,
       arrivalWindow: idx === 0
         ? `+${eta}m (Batch 1)`
-        : `+${effectiveEta}m (Batch ${idx + 1} - +${effectiveEta - (batches[0]?.etaMinutes ?? 0)}m Offset)`,
+        : `+${effectiveEta}m (Batch ${idx + 1} - +${effectiveEta - batch1Eta}m Offset)`,
       departureWindow: `+${effectiveEta + 50}m`,
       actionNote: idx === 0
         ? `Take shortest direct route (${distKm} km). Proceed to ${targetCamp.name} for immediate meal service & rest, then depart by +${effectiveEta + 50}m before Batch 2 arrives.`
         : idx === 1
         ? `Reroute to outer bypass (+${cfg.extraDistKm} km). Enjoy shaded open corridor. Arrive at ${targetCamp.name} after Batch 1 departs with zero entrance queueing.`
         : `Follow extended holding loop (+${cfg.extraDistKm} km buffer). Arrive at ${targetCamp.name} only after Batch ${idx} fully clears — zero wait guaranteed.`,
-    };
-  });
+    });
+  }
 
   const totalPilgrims = sortedDindis.reduce((s, d) => s + d.pilgrimCount, 0);
   const campCapacity = targetCamp.capacity || 40000;

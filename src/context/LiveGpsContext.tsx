@@ -8,7 +8,7 @@ import React, {
   useCallback,
   ReactNode,
 } from "react";
-import { CHECKPOINT_COORDS } from "@/components/map/WariOSMap";
+import { CHECKPOINT_COORDS } from "@/lib/route-constants";
 import { SANT_DNYANESHWAR_ROUTE_CONFIG } from "@/lib/palkhi-schedule";
 import {
   DINDI_CODE_DATABASE,

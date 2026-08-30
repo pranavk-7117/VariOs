@@ -201,7 +201,7 @@ export const PalkhiScheduleTimeline: React.FC = () => {
                 <div>
                   <span className="text-wari-textMuted block">Coordinates</span>
                   <span className="font-bold text-wari-textPrimary font-mono">
-                    {selectedEvent.lat.toFixed(4)}°N, {selectedEvent.lng.toFixed(4)}°E
+                    {typeof selectedEvent?.lat === "number" ? selectedEvent.lat.toFixed(4) : "18.5138"}°N, {typeof selectedEvent?.lng === "number" ? selectedEvent.lng.toFixed(4) : "73.8589"}°E
                   </span>
                 </div>
                 <div>
@@ -332,13 +332,13 @@ export const PalkhiScheduleTimeline: React.FC = () => {
                 <div>
                   <span className="text-wari-textMuted block">Latitude</span>
                   <span className="font-bold text-wari-textPrimary font-mono">
-                    {selectedWaypoint.lat.toFixed(4)}°N
+                    {typeof selectedWaypoint?.lat === "number" ? selectedWaypoint.lat.toFixed(4) : "18.5138"}°N
                   </span>
                 </div>
                 <div>
                   <span className="text-wari-textMuted block">Longitude</span>
                   <span className="font-bold text-wari-textPrimary font-mono">
-                    {selectedWaypoint.lng.toFixed(4)}°E
+                    {typeof selectedWaypoint?.lng === "number" ? selectedWaypoint.lng.toFixed(4) : "73.8589"}°E
                   </span>
                 </div>
               </div>

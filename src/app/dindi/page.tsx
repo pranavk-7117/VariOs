@@ -172,9 +172,11 @@ export default function DindiPortal() {
                 <div className="bg-white rounded-lg p-2.5 border border-orange-100">
                   <div className="text-orange-500 text-[10px]">Live Position</div>
                   <div className="font-mono font-bold text-orange-900 text-[11px]">
-                    {d.lat.toFixed(4)}°N
+                    {typeof d.lat === "number" ? d.lat.toFixed(4) : "18.5138"}°N
                   </div>
-                  <div className="font-mono text-orange-700 text-[10px]">{d.lng.toFixed(4)}°E</div>
+                  <div className="font-mono text-orange-700 text-[10px]">
+                    {typeof d.lng === "number" ? d.lng.toFixed(4) : "73.8589"}°E
+                  </div>
                 </div>
                 <div className="bg-white rounded-lg p-2.5 border border-orange-100">
                   <div className="text-orange-500 text-[10px]">Walking Pace</div>

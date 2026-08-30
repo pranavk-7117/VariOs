@@ -154,53 +154,13 @@ export const VERIFIED_CORRIDOR_HOSPITALS = [
 export async function fetchLiveNearbyHospitals(
   lat: number,
   lng: number,
-  radiusKm = 15
+  radiusKm = 20
 ): Promise<RealHospital[]> {
-  try {
-    // Attempt OpenStreetMap Overpass API for real hospitals near the given coordinate
-    const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json][timeout:5];(node["amenity"="hospital"](around:${radiusKm * 1000},${lat},${lng}););out 8;`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3500);
+  const safeLat = typeof lat === "number" && !isNaN(lat) ? lat : 18.5138;
+  const safeLng = typeof lng === "number" && !isNaN(lng) ? lng : 73.8589;
 
-    const res = await fetch(overpassUrl, { signal: controller.signal });
-    clearTimeout(timer);
-
-    if (res.ok) {
-      const data = await res.json();
-      if (data && Array.isArray(data.elements) && data.elements.length > 0) {
-        const osmHospitals: RealHospital[] = data.elements
-          .filter((el: any) => el.tags && (el.tags.name || el.tags["name:en"] || el.tags["name:mr"]))
-          .map((el: any, idx: number) => {
-            const hLat = el.lat;
-            const hLng = el.lon;
-            const distKm = getDistanceKm(lat, lng, hLat, hLng);
-            const name = el.tags["name:en"] || el.tags.name || el.tags["name:mr"] || `Hospital #${idx + 1}`;
-            return {
-              id: `OSM-HOSP-${el.id}`,
-              name,
-              lat: hLat,
-              lng: hLng,
-              distKm,
-              doctorCount: 8 + (el.id % 15),
-              availableAmbulances: 2 + (el.id % 4),
-              heatStrokeKits: 20 + (el.id % 30),
-              status: "NORMAL" as const,
-              address: el.tags["addr:street"] || el.tags["addr:city"] || "OpenStreetMap Verified",
-            };
-          });
-
-        if (osmHospitals.length > 0) {
-          return osmHospitals.sort((a, b) => a.distKm - b.distKm);
-        }
-      }
-    }
-  } catch (err) {
-    // OpenStreetMap offline or rate-limited; fallback to verified local registry
-  }
-
-  // Fallback to verified corridor hospitals
   return VERIFIED_CORRIDOR_HOSPITALS.map((h) => ({
     ...h,
-    distKm: getDistanceKm(lat, lng, h.lat, h.lng),
+    distKm: getDistanceKm(safeLat, safeLng, h.lat, h.lng),
   })).sort((a, b) => a.distKm - b.distKm);
 }

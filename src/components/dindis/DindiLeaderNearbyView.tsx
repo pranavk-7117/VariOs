@@ -60,9 +60,9 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
   }, [currentLat, currentLng]);
 
   // Compute nearby tankers
-  const nearbyTankers = state.tankers
+  const nearbyTankers = (state.tankers || [])
     .map((t) => {
-      const distKm = getDistanceKm(currentLat, currentLng, t.lat, t.lng);
+      const distKm = getDistanceKm(currentLat, currentLng, t.lat ?? 18.5138, t.lng ?? 73.8589);
       const eta = Math.max(1, Math.round((distKm / 25) * 60)); // 25 km/h urban/highway tanker speed
       return { ...t, distKm, calculatedEta: eta };
     })
@@ -70,9 +70,9 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
     .slice(0, 3);
 
   // Compute nearby verified camps (Camps 1-6)
-  const nearbyCamps = state.camps
+  const nearbyCamps = (state.camps || [])
     .map((c) => {
-      const distKm = getDistanceKm(currentLat, currentLng, c.lat, c.lng);
+      const distKm = getDistanceKm(currentLat, currentLng, c.lat ?? 18.5138, c.lng ?? 73.8589);
       const walkingHours = (distKm / 3.8).toFixed(1);
       return { ...c, distKm, walkingHours };
     })
@@ -80,15 +80,15 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
     .slice(0, 3);
 
   // Compute nearby volunteers
-  const nearbyVolunteers = state.volunteers
-    .map((v) => ({ ...v, distKm: getDistanceKm(currentLat, currentLng, v.lat, v.lng) }))
+  const nearbyVolunteers = (state.volunteers || [])
+    .map((v) => ({ ...v, distKm: getDistanceKm(currentLat, currentLng, v.lat ?? 18.5138, v.lng ?? 73.8589) }))
     .sort((a, b) => a.distKm - b.distKm)
     .slice(0, 4);
 
   // Compute nearby food supply kitchens
   const nearbyFood = (state.foodSupplies || [])
     .map((f) => {
-      const distKm = getDistanceKm(currentLat, currentLng, f.lat, f.lng);
+      const distKm = getDistanceKm(currentLat, currentLng, f.lat ?? 18.5138, f.lng ?? 73.8589);
       const eta = Math.max(1, Math.round((distKm / 30) * 60));
       return { ...f, distKm, calculatedEta: eta };
     })
@@ -96,9 +96,9 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
     .slice(0, 3);
 
   // Compute nearby sanitation crews & bio-toilets
-  const nearbySanitation = state.sanitationCrews
+  const nearbySanitation = (state.sanitationCrews || [])
     .map((s) => {
-      const distKm = getDistanceKm(currentLat, currentLng, s.lat, s.lng);
+      const distKm = getDistanceKm(currentLat, currentLng, s.lat ?? 18.5138, s.lng ?? 73.8589);
       return { ...s, distKm };
     })
     .sort((a, b) => a.distKm - b.distKm)
@@ -106,7 +106,7 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
 
   const handleQuickRequest = (type: "WATER" | "MEDICAL" | "HALT" | "ROAD" | "SANITATION" | "FOOD", label: string) => {
     const posStr = activeDindi
-      ? `${activeDindi.name} (Code: ${activeDindi.passcode || activeDindi.number}) at Lat ${activeDindi.lat.toFixed(4)}, Lng ${activeDindi.lng.toFixed(4)}`
+      ? `${activeDindi.name} (Code: ${activeDindi.passcode || activeDindi.number}) at Lat ${typeof activeDindi.lat === "number" ? activeDindi.lat.toFixed(4) : "18.5138"}, Lng ${typeof activeDindi.lng === "number" ? activeDindi.lng.toFixed(4) : "73.8589"}`
       : coords
       ? `Lat ${coords.lat.toFixed(4)}, Lng ${coords.lng.toFixed(4)}`
       : "Corridor GPS";
@@ -431,7 +431,7 @@ export const DindiLeaderNearbyView: React.FC<{ selectedDindiId?: string }> = ({ 
                     📍 {v.locationName} ({v.distKm} km away)
                   </div>
                   <div className="flex flex-wrap gap-1 pt-0.5">
-                    {v.skills.map((s) => (
+                    {(v.skills || []).map((s) => (
                       <span key={s} className="text-[9px] px-1.5 py-0.2 bg-white border border-gray-200 rounded text-gray-700 font-semibold">
                         {s}
                       </span>

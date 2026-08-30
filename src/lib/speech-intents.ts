@@ -125,11 +125,45 @@ export function normalizeSpeechText(text: string): string {
 export function extractSpeechCount(text: string): string | null {
   const normalized = normalizeSpeechText(text).toLowerCase();
   
-  // 1. Look for explicit digits first (e.g. "500", "1000", "50")
-  const numeric = normalized.match(/\b\d{1,6}\b/);
-  if (numeric) return numeric[0];
+  // 1. Look for explicit count keyword followed by digits or words
+  const countKeywordMatch = normalized.match(
+    /(?:count|संख्या|गिनती|sankhya|people|devotees|pilgrims|लोक|वारकरी|log|lok|varkari)\s*(?:is|are|aahe|ahe|आहे|hai|है)?\s*[:=]?\s*(\d+|\b[a-z\u0900-\u097F\s]+)/i
+  );
+  if (countKeywordMatch) {
+    const after = countKeywordMatch[1].trim();
+    const num = after.match(/^\d+/);
+    if (num) return num[0];
 
-  // 2. Look for composite words or word mappings
+    // Check words inside the count phrase
+    const words = after.split(/\s+/);
+    let total = 0;
+    let current = 0;
+    for (const w of words) {
+      const val = NUMBER_WORDS[w];
+      if (val !== undefined) {
+        if (val === 100 || val === 1000) {
+          current = (current === 0 ? 1 : current) * val;
+          total += current;
+          current = 0;
+        } else if (val >= 100) {
+          total += val;
+        } else {
+          current += val;
+        }
+      }
+    }
+    const res = total + current;
+    if (res > 0) return String(res);
+  }
+
+  // 2. Look for explicit digits at the end or in string
+  const allDigits = normalized.match(/\b\d{1,6}\b/g);
+  if (allDigits && allDigits.length > 0) {
+    const last = allDigits[allDigits.length - 1];
+    return last;
+  }
+
+  // 3. Number words mapping
   const words = normalized.split(/\s+/);
   let total = 0;
   let current = 0;
@@ -164,77 +198,59 @@ export function parseDindiRegistrationSpeech(rawText: string): {
   let mandal = "";
   const count = extractSpeechCount(text) || "";
 
-  // Helper to clean extracted field strings
-  const cleanField = (s: string) =>
+  const leaderRegex =
+    /(?:my\s+name\s+is|my\s+name|leader\s+name\s+is|leader\s+name|leader\s+is|leader|name\s+is|name|माझे\s+नाव\s+आहे|माझे\s+नाव|माझं\s+नाव|माझ\s+नाव|माझा\s+नाव|माझा\s+नाम|माझे\s+नाम|माझ\s+नाम|नाव\s+आहे|नाव|नाम|मेरा\s+नाम\s+है|मेरा\s+नाम|mera\s+naam\s+hai|mera\s+naam|mera\s+name|majha\s+naam|majha\s+name|majha\s+naav|maza\s+naam|maza\s+name|maze\s+naam)\s*[:=]?\s*([^,.:\n]+?)(?=\s+(?:mandal|mandala|dindi|मंडल|मंडळ|दिंडी|count|संख्या|गिनती|sankhya|people|devotees|pilgrims|लोक|वारकरी)|\s*[,.:]|$)/i;
+
+  const mandalRegex =
+    /(?:mandal\s+name\s+is|mandal\s+name|mandal\s+is|mandal|mandala|dindi\s+name\s+is|dindi\s+name|dindi\s+is|dindi|मंडल\s+नाम\s+है|मंडल\s+नाम|मंडल|मंडळ\s+नाव\s+आहे|मंडळ\s+नाव|मंडळ|दिंडी\s+नाव\s+आहे|दिंडी\s+नाव|दिंडी)\s*[:=]?\s*([^,.:\n]+?)(?=\s+(?:count|संख्या|गिनती|sankhya|people|devotees|pilgrims|लोक|वारकरी)|\s*[,.:]|$)/i;
+
+  const cleanLeader = (s: string) =>
     s
-      .replace(/^(majha\s+naam|maza\s+naam|maze\s+naam|majhe\s+naam|mera\s+naam|mera\s+name|my\s+name\s+is|my\s+name|leader\s+name\s+is|leader\s+name|leader\s+is|name\s+is|name|माझे\s+नाव|माझं\s+नाव|माझ\s+नाव|माझा\s+नाव|माझा\s+नाम|माझे\s+नाम|मेरा\s+नाम|नाव\s+आहे|नाव|नाम)\s*[:=]?\s*/gi, "")
-      .replace(/^(mandal\s+name\s+is|mandal\s+name|mandal\s+is|mandal|mandala|dindi\s+name\s+is|dindi\s+name|dindi\s+is|dindi|मंडळ\s+नाव|मंडळ|मंडल\s+नाम|मंडल|दिंडी\s+नाव|दिंडी)\s*[:=]?\s*/gi, "")
-      .replace(/\b(aahe|ahe|आहे|hai|है|h|is|are|a|show|sho|sau|so)\b/gi, " ")
-      .replace(/\b(count|people|devotees|pilgrims|संख्या|लोक|वारकरी|sankhya|log|lok|varkari)\b.*$/i, "")
-      .replace(/\b\d+\b/g, "")
-      .replace(/^[,\.\-\:\s]+|[,\.\-\:\s]+$/g, "")
-      .replace(/\s+/g, " ")
+      .replace(/^(is|are|aahe|ahe|आहे|hai|है)\s+/i, "")
+      .replace(/[,\.\-\:\s]+$/g, "")
       .trim();
 
-  // 1. Leader matching in English, Marathi (Devanagari + Roman), Hindi (Devanagari + Roman)
-  const leaderPrefixes = [
-    "my name is", "leader name is", "leader is", "leader name", "leader", "name is",
-    "मेरा नाम है", "मेरा नाम", "नाम है", "नाम",
-    "माझे नाव आहे", "माझे नाव", "माझं नाव", "माझ नाव", "माझा नाम", "माझे नाम", "माझ नाम", "नाव आहे", "नाव",
-    "mera naam hai", "mera naam", "mera name", "mera naav",
-    "majha naam", "majha name", "majha naav", "majha nav", "majha now",
-    "maza naam", "maza name", "maza naav", "maza nav", "maza now",
-    "maze naam", "maze naav", "maze nav", "majhe naam", "majhe naav", "majhe nav",
-    "naav", "naam"
-  ];
+  const cleanMandal = (s: string) =>
+    s
+      .replace(/^(is|are|aahe|ahe|आहे|hai|है)\s+/i, "")
+      .replace(/\b(show|sho|sau|so)\b$/i, "")
+      .replace(/[,\.\-\:\s]+$/g, "")
+      .trim();
 
-  const mandalPrefixes = [
-    "mandal name is", "mandal name", "mandal is", "mandal nav", "mandal now", "mandal naam", "mandal", "mandala",
-    "dindi name is", "dindi name", "dindi is", "dindi nav", "dindi now", "dindi naam", "dindi",
-    "मंडल नाम है", "मंडल नाम", "मंडल",
-    "मंडळ नाव आहे", "मंडळ नाव", "मंडळ",
-    "दिंडी नाव आहे", "दिंडी नाव", "दिंडी"
-  ];
-
-  const countPrefixes = [
-    "count is", "count", "people count", "pilgrim count", "devotees count", "pilgrims", "people", "devotees",
-    "संख्या आहे", "संख्या", "गिनती", "क्षमता", "लोक", "वारकरी",
-    "sankhya aahe", "sankhya", "log", "lok", "varkari"
-  ];
-
-  const leaderPattern = new RegExp(
-    `(?:${leaderPrefixes.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\s*[:=]?\\s*([^,\\.\\n]+?)(?=\\s+(?:${[...mandalPrefixes, ...countPrefixes].map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})|\\s+\\d+|$)`,
-    "i"
-  );
-
-  const mandalPattern = new RegExp(
-    `(?:${mandalPrefixes.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\s*[:=]?\\s*([^,\\.\\n]+?)(?=\\s+(?:${countPrefixes.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})|\\s+\\d+|$)`,
-    "i"
-  );
-
-  const leaderMatch = text.match(leaderPattern);
-  if (leaderMatch && leaderMatch[1]) {
-    leader = cleanField(leaderMatch[1]);
+  const lMatch = text.match(leaderRegex);
+  if (lMatch && lMatch[1]) {
+    leader = cleanLeader(lMatch[1]);
   }
 
-  const mandalMatch = text.match(mandalPattern);
-  if (mandalMatch && mandalMatch[1]) {
-    mandal = cleanField(mandalMatch[1]);
+  const mMatch = text.match(mandalRegex);
+  if (mMatch && mMatch[1]) {
+    mandal = cleanMandal(mMatch[1]);
   }
 
-  // 3. Fallbacks if one or both tags were omitted
+  // Fallbacks if tags were omitted
   if (!leader || !mandal) {
     const parts = text.split(/,| and | और | आणि | & /i);
     if (parts.length >= 2) {
-      if (!leader) leader = cleanField(parts[0]);
-      if (!mandal) mandal = cleanField(parts[1]);
+      if (!leader) leader = cleanLeader(parts[0]);
+      if (!mandal) mandal = cleanMandal(parts[1]);
     } else if (parts.length === 1 && !count) {
-      if (!leader) leader = cleanField(parts[0]);
+      if (!leader) leader = cleanLeader(parts[0]);
     }
   }
 
-  leader = cleanField(leader);
-  mandal = cleanField(mandal);
+  // Capitalize nicely if alphanumeric
+  if (mandal && /^[a-z0-9\s]+$/i.test(mandal)) {
+    mandal = mandal
+      .split(" ")
+      .map((w) => (w.length === 1 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)))
+      .join(" ");
+  }
+  if (leader && /^[a-z0-9\s]+$/i.test(leader)) {
+    leader = leader
+      .split(" ")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  }
 
   return {
     leader,

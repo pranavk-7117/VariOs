@@ -61,46 +61,54 @@ const PRESET_QUESTIONS: Record<string, string[]> = {
 function detectQueryLanguage(query: string, defaultLang: "en" | "hi" | "mr"): "en" | "hi" | "mr" {
   const q = query.toLowerCase().trim();
 
-  // 1. Marathi Devanagari
+  // 1. Marathi Devanagari specific keywords
   if (
     /[\u0900-\u097F]/.test(query) &&
-    /आहे|कुठे|जवळ|जवळचे|वेळापत्रक|तळ|रिंगण|रुग्णालय|टँकर|पाणी|वारकरी|संख्या|सांगा|जेवण|शौचालय|संडास|अन्न|प्रसाद/.test(query)
+    /आहे|कुठे|जवळ|जवळचे|जवळचा|वेळापत्रक|तळ|तळावर|रिंगण|रुग्णालय|रुग्णालये|टँकर|पाणी|पाण्याचा|वारकरी|संख्या|सांगा|जेवण|शौचालय|प्रसाधनगृह|संडास|अन्न|प्रसाद|अन्नदान|दिंडी|दिंड्या|निवारा|मार्ग|पंढरपूर|काय|नाही|द्या|करा|माहिती|थेट|स्थिती|स्वयंसेवक|कधी|किती|कोणता|कोणतं|कसे|मदत|नमस्कार|विठ्ठल|ज्ञानोबा|माऊली/.test(query)
   ) {
     return "mr";
   }
 
-  // 2. Hindi Devanagari
+  // 2. Hindi Devanagari specific keywords
   if (
     /[\u0900-\u097F]/.test(query) &&
-    /है|कहाँ|कहा|नजदीक|नजदीकी|पानी|टैंकर|अस्पताल|शेड्यूल|शिविर|कितना|बताओ|शौचालय|भोजन|खाना|प्रसाद/.test(query)
+    /है|कहाँ|कहा|नजदीक|नजदीकी|पास|पानी|टैंकर|अस्पताल|शेड्यूल|शिविर|कितना|कितने|बताओ|शौचालय|भोजन|खाना|प्रसाद|श्रद्धालु|रास्ता|रूट|दीजिए|कीजिए|जानकारी|लाइव|स्थिति|स्वयंसेवक|कब|कौन|कौनसा|कैसे|मदद|नमस्ते/.test(query)
   ) {
     return "hi";
   }
 
-  // If general Devanagari without clear markers, use default or Marathi
+  // 3. If general Devanagari without clear markers, default to user language or Marathi
   if (/[\u0900-\u097F]/.test(query)) {
     return defaultLang === "en" ? "mr" : defaultLang;
   }
 
-  // 3. Romanized Marathi keywords ONLY (exclude standard English words)
+  // 4. Romanized / Transliterated Marathi keywords
   if (
-    /\b(aahe|ahe|kuthe|kothe|javal|javalcha|velapatrak|ringan|varkari|panyacha|saanga|jevan|sandas|sandaas|mauli)\b/.test(
+    /\b(aahe|ahe|kuthe|kothe|javal|javalcha|velapatrak|ringan|varkari|panyacha|saanga|jevan|sandas|sandaas|mauli|dindi|pandharpur|shauchalay|kiti|kadhi|kay|madat|vitthal|namaskar|mahiti|sthitii|swayamsevak)\b/.test(
       q
     )
   ) {
     return "mr";
   }
 
-  // 4. Romanized Hindi keywords ONLY (exclude standard English words)
+  // 5. Romanized / Transliterated Hindi keywords
   if (
-    /\b(kahan|kaha|sabse|nazdik|nazdiki|paani|aspataal|batao|kitna|kaunsa|bhojan|khana)\b/.test(
+    /\b(kahan|kaha|sabse|nazdik|nazdiki|paani|aspataal|batao|kitna|kitne|kaunsa|kaun|kab|bhojan|khana|shivir|madad|namaste|jankari|sthiti|swayamsevak)\b/.test(
       q
     )
   ) {
     return "hi";
   }
 
-  // 5. Default to English for English queries (e.g. "where is nearby food", "nearest toilet", "nearest hospital", "camp 5 food")
+  // 6. Context-based default if in Marathi or Hindi UI
+  if (defaultLang === "mr" && !/\b(the|is|where|what|when|which|how|show|tell|nearest|emergency|hospital|water|food)\b/.test(q)) {
+    return "mr";
+  }
+  if (defaultLang === "hi" && !/\b(the|is|where|what|when|which|how|show|tell|nearest|emergency|hospital|water|food)\b/.test(q)) {
+    return "hi";
+  }
+
+  // 7. Default to English
   return "en";
 }
 
@@ -118,6 +126,13 @@ export default function CopilotPage() {
     isSpeaking,
     stopSpeaking,
   } = useSpeechRecognition();
+
+  const [listeningLang, setListeningLang] = useState<"en" | "hi" | "mr">(language);
+
+  // Sync listening language when global UI language changes
+  useEffect(() => {
+    setListeningLang(language);
+  }, [language]);
 
   const isLiveMode = !state.isSimulating;
   const liveDindis = state.dindis.filter((d) => d.isCustomRegistered);
@@ -1108,14 +1123,25 @@ export default function CopilotPage() {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => speak(msg.structured?.forecastText || "", msg.lang || language)}
-                      className="p-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-bold flex items-center gap-1 border border-orange-200"
-                      title="Read aloud"
-                    >
-                      <Volume2 className="w-3.5 h-3.5" />
-                      <span className="text-[10px]">Play Voice</span>
-                    </button>
+                    {isSpeaking ? (
+                      <button
+                        onClick={stopSpeaking}
+                        className="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                        title="Stop Voice Speaking"
+                      >
+                        <VolumeX className="w-3.5 h-3.5" />
+                        <span className="text-[10px]">Stop Voice</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => speak(msg.structured?.forecastText || "", msg.lang || language)}
+                        className="p-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-bold flex items-center gap-1 border border-orange-200"
+                        title="Read aloud"
+                      >
+                        <Volume2 className="w-3.5 h-3.5" />
+                        <span className="text-[10px]">Play Voice</span>
+                      </button>
+                    )}
 
                     <span
                       className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold ${
@@ -1197,47 +1223,128 @@ export default function CopilotPage() {
         ))}
       </div>
 
-      {/* Query Input Bar with Speech Recognition */}
-      <div className="card-base p-3 flex items-center gap-2">
-        <input
-          type="text"
-          value={inputQuery}
-          onChange={(e) => setInputQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleAsk(inputQuery)}
-          placeholder={isListening ? "Listening to your voice..." : "Ask Copilot in English, Hindi, or Marathi..."}
-          className="flex-1 bg-transparent px-4 py-2 text-xs sm:text-sm text-wari-textPrimary placeholder:text-wari-textMuted focus:outline-none font-medium"
-        />
-
-        {/* Speech Mic button */}
-        {isSupported && (
+      {/* ── ACTIVE VOICE SPEAKING BAR ── */}
+      {isSpeaking && (
+        <div className="p-3.5 bg-gradient-to-r from-red-50 via-orange-50 to-red-50 border-2 border-red-300 rounded-2xl flex items-center justify-between shadow-sm animate-fadeIn">
+          <div className="flex items-center gap-2.5 text-xs text-red-950 font-bold">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+            </span>
+            <Volume2 className="w-4 h-4 text-red-600 animate-pulse" />
+            <span>🔊 WariOS Copilot Voice Response Playing...</span>
+          </div>
           <button
-            onClick={isListening ? stopListening : startListening}
-            title={isListening ? "Stop listening" : "Speak query in EN / HI / MR"}
-            className={`p-2.5 rounded-xl border transition-all flex items-center gap-1.5 ${
-              isListening
-                ? "bg-red-500 text-white border-red-400 animate-pulse"
-                : "bg-purple-50 text-purple-800 hover:bg-purple-100 border-purple-200"
-            }`}
+            onClick={stopSpeaking}
+            className="px-4 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-1.5 shadow active:scale-95 transition-all"
           >
-            {isListening ? (
-              <>
-                <MicOff className="w-4 h-4" />
-                <span className="text-xs font-semibold pr-1">Listening...</span>
-              </>
-            ) : (
-              <Mic className="w-4 h-4" />
-            )}
+            <VolumeX className="w-4 h-4" />
+            <span>⏹️ Stop Voice</span>
           </button>
-        )}
+        </div>
+      )}
 
-        {/* Send Button */}
-        <button
-          onClick={() => handleAsk(inputQuery)}
-          disabled={!inputQuery.trim()}
-          className="btn-primary p-2.5 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Send className="w-4 h-4" />
-        </button>
+      {/* Query Input Bar with Speech Recognition & Language Selector */}
+      <div className="card-base p-3 space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+          <span className="text-[11px] font-bold text-stone-500 flex items-center gap-1">
+            <span>🎙️ Spoken Language:</span>
+          </span>
+          <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl border border-stone-200">
+            <button
+              type="button"
+              onClick={() => {
+                setListeningLang("mr");
+                if (isListening) startListening("mr");
+              }}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                listeningLang === "mr"
+                  ? "bg-orange-600 text-white shadow-2xs"
+                  : "text-stone-600 hover:text-stone-900"
+              }`}
+            >
+              🚩 मराठी (MR)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setListeningLang("hi");
+                if (isListening) startListening("hi");
+              }}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                listeningLang === "hi"
+                  ? "bg-orange-600 text-white shadow-2xs"
+                  : "text-stone-600 hover:text-stone-900"
+              }`}
+            >
+              🇮🇳 हिंदी (HI)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setListeningLang("en");
+                if (isListening) startListening("en");
+              }}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                listeningLang === "en"
+                  ? "bg-orange-600 text-white shadow-2xs"
+                  : "text-stone-600 hover:text-stone-900"
+              }`}
+            >
+              🌐 English (EN)
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 pt-1 border-t border-stone-100">
+          <input
+            type="text"
+            value={inputQuery}
+            onChange={(e) => setInputQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAsk(inputQuery)}
+            placeholder={
+              isListening
+                ? `Listening in ${listeningLang === "mr" ? "Marathi" : listeningLang === "hi" ? "Hindi" : "English"}...`
+                : "Ask Copilot in Marathi, Hindi, or English..."
+            }
+            className="flex-1 bg-transparent px-3 py-2 text-xs sm:text-sm text-wari-textPrimary placeholder:text-wari-textMuted focus:outline-none font-medium"
+          />
+
+          {/* Speech Mic button */}
+          {isSupported && (
+            <button
+              onClick={() => (isListening ? stopListening() : startListening(listeningLang))}
+              title={
+                isListening
+                  ? "Stop listening"
+                  : `Speak query in ${listeningLang === "mr" ? "Marathi" : listeningLang === "hi" ? "Hindi" : "English"}`
+              }
+              className={`p-2.5 rounded-xl border transition-all flex items-center gap-1.5 shrink-0 ${
+                isListening
+                  ? "bg-red-500 text-white border-red-400 animate-pulse"
+                  : "bg-purple-50 text-purple-800 hover:bg-purple-100 border-purple-200"
+              }`}
+            >
+              {isListening ? (
+                <>
+                  <MicOff className="w-4 h-4" />
+                  <span className="text-xs font-semibold pr-1">Listening...</span>
+                </>
+              ) : (
+                <Mic className="w-4 h-4" />
+              )}
+            </button>
+          )}
+
+          {/* Send Button */}
+          <button
+            onClick={() => handleAsk(inputQuery)}
+            disabled={!inputQuery.trim()}
+            className="btn-primary p-2.5 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   );

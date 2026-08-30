@@ -15,7 +15,7 @@ interface SpeechRecognitionResult {
   interimTranscript: string;
   isListening: boolean;
   isSupported: boolean;
-  startListening: () => void;
+  startListening: (langOverride?: LangKey | unknown) => void;
   stopListening: () => void;
   reset: () => void;
   speak: (text: string, langOverride?: LangKey) => void;
@@ -47,7 +47,7 @@ export function useSpeechRecognition(): SpeechRecognitionResult {
     setIsListening(false);
   }, []);
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback((langOverride?: LangKey | unknown) => {
     if (!isSupported) return;
     stopListening();
 
@@ -56,7 +56,11 @@ export function useSpeechRecognition(): SpeechRecognitionResult {
       (window as any).webkitSpeechRecognition;
 
     const recognition = new SpeechRecognitionAPI();
-    recognition.lang = LANG_TO_BCP47[language] ?? "en-IN";
+    const activeLang =
+      typeof langOverride === "string" && (langOverride as LangKey) in LANG_TO_BCP47
+        ? (langOverride as LangKey)
+        : language;
+    recognition.lang = LANG_TO_BCP47[activeLang] ?? "en-IN";
     recognition.interimResults = true;
     recognition.continuous = false;
     recognition.maxAlternatives = 1;

@@ -24,6 +24,7 @@ import { useLiveGps } from "@/context/LiveGpsContext";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { parseReportIntent } from "@/lib/speech-intents";
 import { VolunteerTask } from "@/lib/types";
+import { DindiSponsorPortal } from "@/components/volunteer/DindiSponsorPortal";
 
 export default function VolunteerPortal() {
   const { state, addEventLog, reportVolunteerIncident, updateVolunteerTask, markBatchDeparted } = useSimulation();
@@ -32,7 +33,7 @@ export default function VolunteerPortal() {
 
   const [isAvailable, setIsAvailable] = useState(true);
   const [reportSuccess, setReportSuccess] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"tasks" | "report" | "dindis" | "team">("tasks");
+  const [activeTab, setActiveTab] = useState<"tasks" | "report" | "dindis" | "team" | "sponsor">("tasks");
   const [selectedCampId, setSelectedCampId] = useState<string>("ALL");
   const [reportCampId, setReportCampId] = useState<string>("AUTO");
   const [remarksByTask, setRemarksByTask] = useState<Record<string, string>>({});
@@ -238,12 +239,13 @@ export default function VolunteerPortal() {
       )}
 
       {/* ── TAB NAVIGATION ── */}
-      <div className="flex gap-2 bg-wari-pageBg p-1 rounded-xl border border-wari-cardBorder">
+      <div className="flex flex-wrap gap-2 bg-wari-pageBg p-1.5 rounded-xl border border-wari-cardBorder">
         {[
           { id: "tasks", label: `📋 Assigned Tasks (${filteredTasks.length})` },
           { id: "report", label: "🚨 Report Incident" },
           { id: "dindis", label: `🚩 Dindis (${realDindis.length})` },
           { id: "team", label: "👥 Volunteers (Camps 1–6)" },
+          { id: "sponsor", label: "🍲 अन्नदान व निवारा (Sponsor Food & Stay)" },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -664,6 +666,9 @@ export default function VolunteerPortal() {
           </div>
         </div>
       )}
+
+      {/* ── TAB 5: SPONSOR FOOD, STAY & SEVA (Formspree Email to Volunteers) ── */}
+      {activeTab === "sponsor" && <DindiSponsorPortal />}
 
     </div>
   );
